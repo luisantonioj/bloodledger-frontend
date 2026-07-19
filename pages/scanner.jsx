@@ -1,138 +1,328 @@
-// pages/scanner.jsx — Scan & intake new units (IoT edge device)
+// pages/scanner.jsx
+// Simplified BloodLedger scan / add blood unit page.
+//
+// This version keeps the scanning concept visible without assuming
+// finalized hospital workflows, scanner hardware behavior, blockchain
+// commit details, storage locations, or donor-related data fields.
 
 function ScannerPage({ permissions, onNav }) {
-  const [mode, setMode] = React.useState("ISBT");
+  const [mode, setMode] = React.useState("Scan");
   const [scanned, setScanned] = React.useState(null);
-  const [committed, setCommitted] = React.useState(window.SCAN_HISTORY);
-  const [online, setOnline] = React.useState(typeof navigator === "undefined" ? true : navigator.onLine);
+  const [history, setHistory] = React.useState(window.SCAN_HISTORY || []);
 
-  React.useEffect(() => {
-    const update = () => setOnline(navigator.onLine);
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
-    return () => {
-      window.removeEventListener("online", update);
-      window.removeEventListener("offline", update);
-    };
-  }, []);
-
-  React.useEffect(() => {
-    if (!online) return;
-    setCommitted((rows) => rows.map((row) => row.status === "Buffered"
-      ? { ...row, status: "Committed", block: row.block || 124894 }
-      : row));
-  }, [online]);
-
-  const fakeScan = () => {
-    const next = {
-      isbt: "=)W0381 2512 100118",
+  const simulateScan = () => {
+    setScanned({
+      isbt: "W0381-2512-100118",
       type: "B-",
       comp: "PRBC",
-      donor_hash: "0xdb9f…40c1",
-      collected: "2026-05-21",
-      expires: "2026-07-02",
-      source: "PRC Lipa City Chapter",
-      temp_at_intake: 4.0,
-    };
-    setScanned(next);
+      collected: "2026-07-18",
+      expires: "2026-08-29",
+      status: "Available",
+    });
   };
-  const commit = async () => {
-    const result = await BloodLedgerApi.ingestScan(scanned, { offline: !online });
-    setCommitted((c) => [{ isbt: scanned.isbt, type: scanned.type, comp: scanned.comp,
-      expires: scanned.expires, status: result.status, ts: new Date().toLocaleTimeString("en-PH", { hour12: false }),
-      block: result.block }, ...c]);
+
+  const addUnit = () => {
+    if (!scanned) return;
+
+    const newEntry = {
+      isbt: scanned.isbt,
+      type: scanned.type,
+      comp: scanned.comp,
+      expires: scanned.expires,
+      status: "Added",
+      ts: new Date().toLocaleTimeString("en-PH", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+
+    setHistory((current) => [newEntry, ...current]);
     setScanned(null);
   };
-  const buffered = committed.filter((row) => row.status === "Buffered").length;
 
   return (
     <div className="page">
       <PageHead
-        eyebrow="IoT edge · MMC-A scanner"
-        title="Scan & Intake"
-        sub="Decode an ISBT-128 label, write the unit to your peer, and stage it for the next chaincode block. Operations are buffered locally and replayed if the network blinks."
+        eyebrow="BloodLedger"
+        title="Scan / Add Blood Unit"
+        sub="Scan a blood unit label or enter its basic information to add it to the mock inventory."
         actions={
           <>
-            <Btn icon="upload" size="sm">Manual entry</Btn>
-            <Btn icon="settings" size="sm">Scanner status</Btn>
+            <Btn
+              size="sm"
+              kind="ghost"
+              onClick={() => onNav("inventory")}
+            >
+              View Inventory
+            </Btn>
           </>
         }
       />
 
       <div className="grid-dash">
+        {/* Scan area */}
         <div className="card">
           <div className="card-h">
-            <h3>Camera</h3>
+            <div>
+              <h3>Blood Unit Input</h3>
+              <div className="sub muted">
+                Choose a simple input method for the prototype.
+              </div>
+            </div>
+
             <div className="actions">
-              <div className="row" style={{ gap: 6 }}>
-                {["ISBT", "QR", "Manual"].map((m) => (
-                  <button key={m} className={`filter-chip ${mode === m ? "active" : ""}`} onClick={() => setMode(m)}>{m}</button>
+              <div
+                className="row"
+                style={{ gap: 6 }}
+              >
+                {["Scan", "Manual"].map((item) => (
+                  <button
+                    key={item}
+                    className={`filter-chip ${
+                      mode === item ? "active" : ""
+                    }`}
+                    onClick={() => setMode(item)}
+                  >
+                    {item}
+                  </button>
                 ))}
               </div>
             </div>
           </div>
+
           <div className="card-b">
-            <div className="scanner-view">
-              <div className="scanner-grid" />
-              <div className="scanline" />
-              <div className="scanner-meta"><span className="rec-dot" /> LIVE · ISBT-128 · 60 fps</div>
-              <div style={{ position: "absolute", bottom: 16, left: 16, fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.6)" }}>
-                MMC-A · serial 02-9F-43-AA · firmware 1.4.2
+            {mode === "Scan" ? (
+              <>
+                <div className="scanner-view">
+                  <div className="scanner-grid" />
+                  <div className="scanline" />
+
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: 30,
+                      color: "rgba(255,255,255,0.65)",
+                      fontSize: 13,
+                    }}
+                  >
+                    Position the blood unit label within the scanning area
+                  </div>
+                </div>
+
+                <div style={{ height: 14 }} />
+
+                <div className="row">
+                  {permissions.canScan ? (
+                    <Btn
+                      kind="primary"
+                      icon="scanner"
+                      onClick={simulateScan}
+                    >
+                      Simulate Scan
+                    </Btn>
+                  ) : (
+                    <span className="muted small">
+                      This account has view-only access.
+                    </span>
+                  )}
+
+                  <Btn
+                    kind="ghost"
+                    icon="refresh"
+                    onClick={() => setScanned(null)}
+                  >
+                    Reset
+                  </Btn>
+                </div>
+              </>
+            ) : (
+              <div>
+                <div
+                  className="muted small"
+                  style={{ marginBottom: 16 }}
+                >
+                  Manual entry is shown as a basic mock-up only. The final required
+                  fields can be confirmed after stakeholder consultation.
+                </div>
+
+                <div className="kv">
+                  <dt>Unit ID</dt>
+                  <dd>
+                    <input
+                      className="input mono"
+                      placeholder="Enter blood unit ID"
+                    />
+                  </dd>
+
+                  <dt>Blood Type</dt>
+                  <dd>
+                    <select className="input">
+                      {window.BLOOD_TYPES.map((type) => (
+                        <option key={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                  </dd>
+
+                  <dt>Component</dt>
+                  <dd>
+                    <select className="input">
+                      {window.COMPONENTS.map((component) => (
+                        <option key={component}>
+                          {component}
+                        </option>
+                      ))}
+                    </select>
+                  </dd>
+
+                  <dt>Expiration Date</dt>
+                  <dd>
+                    <input
+                      className="input"
+                      type="date"
+                    />
+                  </dd>
+                </div>
+
+                <div
+                  className="row"
+                  style={{ marginTop: 18 }}
+                >
+                  <Btn
+                    kind="primary"
+                    icon="check"
+                    onClick={simulateScan}
+                  >
+                    Preview Entry
+                  </Btn>
+                </div>
               </div>
-              <div style={{ textAlign: "center", padding: 24, color: "rgba(255,255,255,0.5)", fontSize: 12 }}>
-                Align label within the dashed frame
-              </div>
-            </div>
-            <div style={{ height: 12 }} />
-            <div className="row">
-              {permissions.canScan && <Btn kind="primary" icon="scanner" onClick={fakeScan}>Simulate scan</Btn>}
-              <Btn icon="refresh">Reset</Btn>
-              <div style={{ marginLeft: "auto" }} className="muted small">
-                <span className="live-dot" /> Buffered ops: {buffered} · {online ? "peer reachable" : "offline buffer active"}
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
+        {/* Preview */}
         <div className="card">
           <div className="card-h">
-            <h3>{scanned ? "Decoded unit · ready to commit" : "Awaiting scan"}</h3>
-            <div className="sub muted">Chaincode: <span className="mono">unit-cc v1.7</span></div>
+            <div>
+              <h3>
+                {scanned
+                  ? "Blood Unit Preview"
+                  : "Awaiting Input"}
+              </h3>
+
+              <div className="sub muted">
+                Review the basic information before adding the unit.
+              </div>
+            </div>
           </div>
+
           <div className="card-b">
             {!permissions.canScan ? (
-              <div className="muted small" style={{ padding: "32px 8px", textAlign: "center" }}>
-                This session is read-only for scan intake. Inventory writes are limited to the Mary Mediatrix primary node.
+              <div
+                className="muted small"
+                style={{
+                  padding: "32px 8px",
+                  textAlign: "center",
+                }}
+              >
+                This session has read-only access.
               </div>
             ) : !scanned ? (
-              <div className="muted small" style={{ padding: "32px 8px", textAlign: "center" }}>
-                Scan a unit's ISBT-128 label or paste its hash to decode.
+              <div
+                className="muted small"
+                style={{
+                  padding: "32px 8px",
+                  textAlign: "center",
+                }}
+              >
+                Scan a blood unit or create a manual entry to preview its
+                information.
               </div>
             ) : (
               <>
-                <div className="row" style={{ gap: 14, alignItems: "center" }}>
-                  <BloodType type={scanned.type} lg />
+                <div
+                  className="row"
+                  style={{
+                    gap: 14,
+                    alignItems: "center",
+                  }}
+                >
+                  <BloodType
+                    type={scanned.type}
+                    lg
+                  />
+
                   <div>
-                    <div className="mono">{scanned.isbt}</div>
-                    <div className="muted small">{scanned.comp} · collected {scanned.collected}</div>
+                    <div className="mono">
+                      {scanned.isbt}
+                    </div>
+
+                    <div className="muted small">
+                      {scanned.comp}
+                    </div>
                   </div>
                 </div>
+
                 <div className="divider" />
+
                 <dl className="kv">
-                  <dt>Donor</dt><dd className="mono small">{scanned.donor_hash} <Chip kind="ok" dot>Consent verified</Chip></dd>
-                  <dt>Source</dt><dd>{scanned.source}</dd>
-                  <dt>Expires</dt><dd className="mono small">{scanned.expires}</dd>
-                  <dt>Temp at intake</dt><dd className="mono small">{scanned.temp_at_intake.toFixed(1)}°C <Chip kind="ok" dot>Within range</Chip></dd>
-                  <dt>Shelf assignment</dt>
-                  <dd className="mono small">R-2 / A-05 <span className="muted">(auto)</span></dd>
-                  <dt>Endorsement</dt><dd className="mono small">MMCMSP.member</dd>
+                  <dt>Unit ID</dt>
+                  <dd className="mono small">
+                    {scanned.isbt}
+                  </dd>
+
+                  <dt>Blood Type</dt>
+                  <dd>
+                    {scanned.type}
+                  </dd>
+
+                  <dt>Component</dt>
+                  <dd>
+                    {scanned.comp}
+                  </dd>
+
+                  <dt>Collection Date</dt>
+                  <dd className="mono small">
+                    {scanned.collected || "—"}
+                  </dd>
+
+                  <dt>Expiration Date</dt>
+                  <dd className="mono small">
+                    {scanned.expires}
+                  </dd>
+
+                  <dt>Status</dt>
+                  <dd>
+                    <Chip
+                      kind="ok"
+                      dot
+                    >
+                      {scanned.status}
+                    </Chip>
+                  </dd>
                 </dl>
+
                 <div className="divider" />
+
                 <div className="row">
-                  <Btn kind="ghost" onClick={() => setScanned(null)}>Reject</Btn>
-                  <Btn icon="refresh" onClick={fakeScan}>Re-scan</Btn>
+                  <Btn
+                    kind="ghost"
+                    onClick={() => setScanned(null)}
+                  >
+                    Cancel
+                  </Btn>
+
                   <span style={{ flex: 1 }} />
-                  <Btn kind="primary" icon="check" onClick={commit}>{online ? "Commit to ledger" : "Buffer locally"}</Btn>
+
+                  <Btn
+                    kind="primary"
+                    icon="check"
+                    onClick={addUnit}
+                  >
+                    Add Blood Unit
+                  </Btn>
                 </div>
               </>
             )}
@@ -142,37 +332,118 @@ function ScannerPage({ permissions, onNav }) {
 
       <div style={{ height: 18 }} />
 
+      {/* Recent intake */}
       <div className="card">
         <div className="card-h">
-          <h3>Today's intake</h3>
-          <div className="sub muted">{committed.length} unit{committed.length !== 1 ? "s" : ""} committed since 00:00</div>
-          <div className="actions"><Btn size="sm" icon="download">Export</Btn></div>
+          <div>
+            <h3>Recently Added Units</h3>
+            <div className="sub muted">
+              Sample records added through the scan or manual input workflow.
+            </div>
+          </div>
         </div>
+
         <div className="card-b flush">
           <table className="tbl">
-            <thead><tr>
-              <th>Time</th><th>ISBT</th><th>Type</th><th>Component</th><th>Expires</th><th>Block</th><th>Status</th>
-            </tr></thead>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Unit ID</th>
+                <th>Blood Type</th>
+                <th>Component</th>
+                <th>Expiration Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+
             <tbody>
-              {committed.map((c, i) => (
-                <tr key={c.isbt + i}>
-                  <td className="mono small">{c.ts}</td>
-                  <td className="mono small">{c.isbt}</td>
-                  <td><BloodType type={c.type} /></td>
-                  <td>{c.comp}</td>
-                  <td className="mono small">{c.expires}</td>
-                  <td className="mono small">{c.block ? `#${c.block}` : "—"}</td>
-                  <td>
-                    <Chip kind={transferStatusKind(c.status)} dot>{c.status}</Chip>
+              {history.length > 0 ? (
+                history.map((item, index) => (
+                  <tr key={`${item.isbt}-${index}`}>
+                    <td className="mono small">
+                      {item.ts || "—"}
+                    </td>
+
+                    <td className="mono small">
+                      {item.isbt}
+                    </td>
+
+                    <td>
+                      <BloodType type={item.type} />
+                    </td>
+
+                    <td>
+                      {item.comp}
+                    </td>
+
+                    <td className="mono small">
+                      {item.expires}
+                    </td>
+
+                    <td>
+                      <Chip
+                        kind={
+                          item.status === "Added"
+                            ? "ok"
+                            : "info"
+                        }
+                        dot
+                      >
+                        {item.status || "Recorded"}
+                      </Chip>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan="6"
+                    className="muted"
+                    style={{
+                      textAlign: "center",
+                      padding: 30,
+                    }}
+                  >
+                    No units have been added yet.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div style={{ height: 18 }} />
+
+      <div className="card">
+        <div className="card-b">
+          <div
+            className="row"
+            style={{ gap: 12 }}
+          >
+            <I
+              name="info"
+              size={16}
+            />
+
+            <div>
+              <div className="small">
+                Prototype workflow
+              </div>
+
+              <div className="muted tiny">
+                Scanner hardware behavior, barcode data fields, required intake
+                information, and validation rules are placeholders until the
+                hospital workflow is confirmed.
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-Object.assign(window, { ScannerPage });
+Object.assign(window, {
+  ScannerPage,
+});

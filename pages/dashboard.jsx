@@ -1,70 +1,159 @@
-// pages/dashboard.jsx — Live data matrix + activity
+// pages/dashboard.jsx
+// Simplified BloodLedger base dashboard
+//
+// This version intentionally avoids detailed hospital-specific workflows,
+// BROA scoring, ML forecasts, blockchain metrics, and consortium assumptions.
+// The purpose is to provide a neutral base mock-up that can later be refined
+// after stakeholder interviews.
 
 function DashboardPage({ hospital, permissions, transfers, onNav, onAct }) {
-  const matrix = window.MATRIX;
-  const totalUnits = matrix.reduce((s, m) => s + m.units, 0);
-  const critical = matrix.filter((m) => m.status === "critical").length;
-  const warn = matrix.filter((m) => m.status === "warn").length;
-  const surplus = matrix.filter((m) => m.status === "surplus").length;
+  const matrix = window.MATRIX || [];
+  const alerts = window.ALERTS || [];
+  const transferData = transfers || window.TRANSFERS || [];
+
+  // Basic inventory summary
+  const totalUnits = matrix.reduce((sum, item) => {
+    return sum + (Number(item.units) || 0);
+  }, 0);
+
+  // For the base mock-up, these statuses are only visual placeholders.
+  // Their actual business rules can be defined after stakeholder validation.
+  const lowStockCount = matrix.filter(
+    (item) => item.status === "critical" || item.status === "warn"
+  ).length;
+
+  const pendingRequests = transferData.filter(
+    (item) =>
+      item.status === "Pending" ||
+      item.status === "Requested" ||
+      item.requestOnly
+  ).length;
+
+  // Temporary estimate using existing mock alerts.
+  // This avoids introducing a new data model before requirements are confirmed.
+  const expiringSoonCount = alerts.filter((alert) => {
+    const text = `${alert.title || ""} ${alert.desc || ""}`.toLowerCase();
+
+    return (
+      text.includes("expir") ||
+      text.includes("near-expiry") ||
+      text.includes("near expiry")
+    );
+  }).length;
+
+  const visibleAlerts = alerts.slice(0, 3);
+  const recentTransfers = transferData.slice(0, 5);
 
   return (
     <div className="page">
+      {/* Page heading */}
       <PageHead
-        eyebrow={`Live · ${hospital.short}`}
-        title="Data Matrix"
-        sub="Real-time inventory across blood groups and components. Cells are live: pulled from your peer and reconciled against the consortium ledger every 30 seconds."
+        eyebrow={hospital ? hospital.short : "BloodLedger"}
+        title="Dashboard"
+        sub="A simple overview of blood inventory, requests, alerts, and recent system activity."
         actions={
           <>
-            <Btn icon="filter" size="sm">Component: PRBC</Btn>
-            <Btn icon="refresh" size="sm">Refresh</Btn>
-            {permissions.canCreateTransfer && <Btn kind="primary" icon="plus" onClick={() => onNav("transfers")}>New transfer</Btn>}
+            <Btn
+              icon="refresh"
+              size="sm"
+              onClick={() => window.location.reload()}
+            >
+              Refresh
+            </Btn>
           </>
         }
       />
 
-      {/* KPIs */}
+      {/* Basic summary cards */}
       <div className="stat-grid">
-        <Stat label="On-hand units" value={totalUnits} unit="units"
-          delta="+4 vs 24h ago" deltaDir="up"
-          spark={<Spark data={[60, 62, 58, 64, 68, 70, 73]} color="var(--ink-2)" />} />
-        <Stat label="Critical groups" value={critical} unit={critical === 1 ? "group" : "groups"}
-          delta="O− and AB− at threshold" deltaDir="down" accent="critical"
-          spark={<Spark data={[1,2,2,2,3,2,2]} color="var(--critical)" />} />
-        <Stat label="Days of cover (median)" value="4.5" unit="days"
-          delta="−0.3 day" deltaDir="down" accent="warn"
-          spark={<Spark data={[5.1,5.0,4.7,4.6,4.5,4.5,4.5]} color="var(--warn)" />} />
-        <Stat label="Pending transfers" value="3" unit=""
-          delta="2 inbound · 1 outbound" deltaDir="neutral" accent="info" />
+        <Stat
+          label="Total Blood Units"
+          value={totalUnits}
+          unit="units"
+        />
+
+        <Stat
+          label="Expiring Soon"
+          value={expiringSoonCount}
+          unit={expiringSoonCount === 1 ? "unit" : "units"}
+          accent="warn"
+        />
+
+        <Stat
+          label="Low Stock"
+          value={lowStockCount}
+          unit={lowStockCount === 1 ? "type" : "types"}
+          accent={lowStockCount > 0 ? "critical" : undefined}
+        />
+
+        <Stat
+          label="Pending Requests"
+          value={pendingRequests}
+          unit=""
+          accent="info"
+        />
       </div>
 
       <div style={{ height: 18 }} />
 
-      {/* Matrix card */}
+      {/* Blood inventory overview */}
       <div className="card">
         <div className="card-h">
-          <h3>Inventory matrix — PRBC</h3>
-          <div className="sub muted">Click any group to drill into FEFO-sequenced units.</div>
+          <div>
+            <h3>Blood Inventory Overview</h3>
+            <div className="sub muted">
+              Current mock inventory by blood type.
+            </div>
+          </div>
+
           <div className="actions">
-            <Chip kind="critical" dot>{critical} critical</Chip>
-            <Chip kind="warn" dot>{warn} low</Chip>
-            <Chip kind="info" dot>{surplus} surplus</Chip>
+            <Btn
+              size="sm"
+              kind="ghost"
+              onClick={() => onNav("inventory")}
+            >
+              View inventory <I name="arrowRight" size={12} />
+            </Btn>
           </div>
         </div>
+
         <div className="card-b">
           <div className="matrix">
-            {matrix.map((m) => (
-              <button key={m.type}
-                className={`matrix-cell s-${m.status}`}
-                onClick={() => onNav("inventory", { type: m.type })}>
+            {matrix.map((item) => (
+              <button
+                key={item.type}
+                className={`matrix-cell s-${item.status || "normal"}`}
+                onClick={() =>
+                  onNav("inventory", {
+                    type: item.type,
+                  })
+                }
+              >
                 <div className="indicator" />
+
                 <div className="head">
-                  <BloodType type={m.type} />
-                  <span className="muted tiny mono">
-                    {m.trend > 0 ? `+${m.trend}` : m.trend} 24h
-                  </span>
+                  <BloodType type={item.type} />
+
+                  {item.status === "critical" && (
+                    <span className="muted tiny">
+                      Low stock
+                    </span>
+                  )}
+
+                  {item.status === "warn" && (
+                    <span className="muted tiny">
+                      Low
+                    </span>
+                  )}
                 </div>
-                <div className="units serif tnum">{m.units}</div>
-                <div className="unit-suffix">{m.days_cover.toFixed(1)} d cover</div>
+
+                <div className="units serif tnum">
+                  {item.units}
+                </div>
+
+                <div className="unit-suffix">
+                  units available
+                </div>
               </button>
             ))}
           </div>
@@ -73,76 +162,168 @@ function DashboardPage({ hospital, permissions, transfers, onNav, onAct }) {
 
       <div style={{ height: 18 }} />
 
-      {/* Bottom row: priority alerts + activity */}
+      {/* Alerts and recent activity */}
       <div className="grid-dash">
+
+        {/* Basic alerts */}
         <div className="card">
           <div className="card-h">
-            <h3>Priority alerts</h3>
-            <div className="sub muted">From BROA · Blood Recommendation & Optimization Agent</div>
+            <div>
+              <h3>Alerts</h3>
+              <div className="sub muted">
+                Inventory and system notifications.
+              </div>
+            </div>
+
             <div className="actions">
-              <Btn size="sm" kind="ghost" onClick={() => onNav("alerts")}>View all <I name="arrowRight" size={12} /></Btn>
+              <Btn
+                size="sm"
+                kind="ghost"
+                onClick={() => onNav("alerts")}
+              >
+                View all <I name="arrowRight" size={12} />
+              </Btn>
             </div>
           </div>
-          <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {window.ALERTS.slice(0, 3).map((a) => (
-              <div key={a.id} className={`alert-card ${a.severity}`}>
-                <div>
-                  <div className="row" style={{ gap: 8 }}>
-                    <span className={`chip ${a.severity === "critical" ? "solid-critical" : a.severity === "warn" ? "warn" : "info"}`}
-                          style={a.severity === "critical" ? { color: "#fff" } : null}>
-                      {a.severity.toUpperCase()}
-                    </span>
-                    <div className="title">{a.title}</div>
-                  </div>
-                  <div className="desc">{a.desc}</div>
-                  <div className="meta">
-                    <span><I name="clock" size={11} /> {a.when}</span>
-                    <span>· {a.source}</span>
+
+          <div
+            className="card-b"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            {visibleAlerts.length > 0 ? (
+              visibleAlerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className={`alert-card ${alert.severity || "info"}`}
+                >
+                  <div>
+                    <div
+                      className="row"
+                      style={{ gap: 8 }}
+                    >
+                      <span
+                        className={`chip ${
+                          alert.severity === "critical"
+                            ? "solid-critical"
+                            : alert.severity === "warn"
+                            ? "warn"
+                            : "info"
+                        }`}
+                        style={
+                          alert.severity === "critical"
+                            ? { color: "#fff" }
+                            : null
+                        }
+                      >
+                        {alert.severity
+                          ? alert.severity.toUpperCase()
+                          : "INFO"}
+                      </span>
+
+                      <div className="title">
+                        {alert.title}
+                      </div>
+                    </div>
+
+                    <div className="desc">
+                      {alert.desc}
+                    </div>
+
+                    {alert.when && (
+                      <div className="meta">
+                        <span>
+                          <I name="clock" size={11} />{" "}
+                          {alert.when}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="quick">
-                  {a.actions.filter((act) => permissions.canCreateTransfer || act.kind !== "primary").map((act, i) => (
-                    <Btn key={i} kind={act.kind === "primary" ? "primary" : "ghost"} size="sm"
-                         onClick={() => act.goto && onAct(act)}>
-                      {act.label}
-                    </Btn>
-                  ))}
-                </div>
+              ))
+            ) : (
+              <div className="muted">
+                No alerts to display.
               </div>
-            ))}
+            )}
           </div>
         </div>
 
+        {/* Recent activity */}
         <div className="card">
           <div className="card-h">
-            <h3>Network activity</h3>
-            <div className="sub muted"><span className="live-dot" /> Live from consortium</div>
+            <div>
+              <h3>Recent Activity</h3>
+              <div className="sub muted">
+                Latest mock activity recorded in the system.
+              </div>
+            </div>
           </div>
+
           <div className="card-b flush">
-            <table className="tbl">
-              <thead><tr>
-                <th>Tx</th><th>Type</th><th className="right">Units</th><th>Route</th><th>Status</th>
-              </tr></thead>
-              <tbody>
-                {(transfers || window.TRANSFERS).slice(0, 6).map((t) => (
-                  <tr key={t.id} className="row-clickable" onClick={() => onNav("transfers", { selectId: t.id })}>
-                    <td className="mono">{t.id}</td>
-                    <td><BloodType type={t.type} /></td>
-                    <td className="right tnum">{t.units}</td>
-                    <td className="small">
-                      {hospitalById(t.from).short}
-                      <I name="arrowRight" size={11} />
-                      {hospitalById(t.to).short}
-                    </td>
-                    <td>
-                      <Chip kind={transferStatusKind(t.status)} dot>
-                        {t.status}
-                      </Chip>
-                    </td>
+            {recentTransfers.length > 0 ? (
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Activity</th>
+                    <th>Blood Type</th>
+                    <th className="right">Units</th>
+                    <th>Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+
+                <tbody>
+                  {recentTransfers.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="row-clickable"
+                      onClick={() =>
+                        onNav("transfers", {
+                          selectId: item.id,
+                        })
+                      }
+                    >
+                      <td>
+                        <div className="small">
+                          Blood transfer
+                        </div>
+
+                        <div className="tiny muted mono">
+                          {item.id}
+                        </div>
+                      </td>
+
+                      <td>
+                        <BloodType type={item.type} />
+                      </td>
+
+                      <td className="right tnum">
+                        {item.units}
+                      </td>
+
+                      <td>
+                        <Chip
+                          kind={transferStatusKind(item.status)}
+                          dot
+                        >
+                          {item.status}
+                        </Chip>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div
+                className="muted"
+                style={{ padding: 20 }}
+              >
+                No recent activity to display.
+              </div>
+            )}
           </div>
         </div>
       </div>

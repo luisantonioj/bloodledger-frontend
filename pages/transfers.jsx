@@ -1,416 +1,846 @@
-// pages/transfers.jsx — Active transfers list + BROA-guided wizard
+// pages/transfers.jsx
+// Simplified BloodLedger requests and transfers page.
+//
+// The Blood Request form uses self-contained styling so that it matches
+// the visual design of the BloodLedger prototype without depending on
+// additional CSS classes.
 
-function TransfersPage({ hospital, permissions, transfers, onNav, prefill, onCommit }) {
-  const [openWizard, setOpenWizard] = React.useState(!!prefill);
-  const [selectedId, setSelectedId] = React.useState(prefill?.selectId || null);
-  const [filterStatus, setFilterStatus] = React.useState("ALL");
-  const transferList = transfers || window.TRANSFERS;
+function TransfersPage({
+  hospital,
+  permissions,
+  transfers,
+  onNav,
+  prefill,
+  onCommit,
+}) {
+  const transferList = transfers || window.TRANSFERS || [];
+
+  const [activeTab, setActiveTab] = React.useState("requests");
+  const [showRequestForm, setShowRequestForm] = React.useState(false);
+  const [selectedId, setSelectedId] = React.useState(
+    prefill?.selectId || null
+  );
+
+  const [bloodType, setBloodType] = React.useState(
+    prefill?.type || "O+"
+  );
+
+  const [units, setUnits] = React.useState(
+    prefill?.units || 1
+  );
+
+  const [urgency, setUrgency] = React.useState(
+    prefill?.urgency || "Routine"
+  );
+
+  const [note, setNote] = React.useState("");
 
   React.useEffect(() => {
-    if (prefill && (prefill.type || prefill.unit || prefill.surplus)) setOpenWizard(true);
-    if (prefill?.selectId) setSelectedId(prefill.selectId);
+    if (prefill?.selectId) {
+      setSelectedId(prefill.selectId);
+      setActiveTab("transfers");
+    }
+
+    if (prefill?.type || prefill?.units) {
+      setShowRequestForm(true);
+    }
   }, [prefill]);
 
-  const filtered = transferList.filter((t) => filterStatus === "ALL" || t.status === filterStatus);
-  const selected = transferList.find((t) => t.id === selectedId) || transferList[0];
+  const requests = transferList.filter((item) => {
+    return (
+      item.requestOnly ||
+      item.status === "Pending" ||
+      item.status === "Requested"
+    );
+  });
+
+  const activeTransfers = transferList.filter((item) => {
+    return !item.requestOnly;
+  });
+
+  const selectedTransfer =
+    activeTransfers.find((item) => item.id === selectedId) ||
+    activeTransfers[0] ||
+    null;
+
+  const createRequest = async () => {
+    const payload = {
+      type: bloodType,
+      units: Number(units),
+      urgency,
+      to: hospital?.id,
+      requestOnly: true,
+      note,
+    };
+
+    if (onCommit) {
+      await onCommit(payload);
+    }
+
+    setShowRequestForm(false);
+    setNote("");
+    setUnits(1);
+    setUrgency("Routine");
+  };
+
+  /*
+   * Self-contained form styles.
+   * These use explicit colors so the form remains styled even if
+   * the existing global stylesheet does not define form control classes.
+   */
+
+  const formCardStyle = {
+    background: "#ffffff",
+    border: "1px solid #e3ded5",
+    borderRadius: "12px",
+    overflow: "hidden",
+  };
+
+  const formHeaderStyle = {
+    padding: "20px 22px",
+    borderBottom: "1px solid #ebe6de",
+    background: "#ffffff",
+  };
+
+  const formBodyStyle = {
+    padding: "24px 22px",
+    background: "#fdfcf9",
+  };
+
+  const fieldsGridStyle = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+    gap: "20px",
+  };
+
+  const fieldGroupStyle = {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  };
+
+  const labelStyle = {
+    display: "block",
+    fontSize: "12px",
+    fontWeight: "600",
+    color: "#4f4a44",
+    letterSpacing: "0.02em",
+  };
+
+  const inputStyle = {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "11px 12px",
+    background: "#ffffff",
+    color: "#1f1d1b",
+    border: "1px solid #d9d3ca",
+    borderRadius: "8px",
+    fontFamily: "inherit",
+    fontSize: "14px",
+    lineHeight: "1.4",
+    outline: "none",
+    minHeight: "42px",
+  };
+
+  const textareaStyle = {
+    ...inputStyle,
+    minHeight: "96px",
+    resize: "vertical",
+  };
+
+  const helperStyle = {
+    fontSize: "11px",
+    color: "#888078",
+    lineHeight: "1.4",
+  };
+
+  const footerStyle = {
+    display: "flex",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: "10px",
+    marginTop: "24px",
+    paddingTop: "20px",
+    borderTop: "1px solid #ebe6de",
+  };
 
   return (
     <div className="page">
       <PageHead
-        eyebrow="Network · 5 peers"
-        title="Transfers"
-        sub="Multi-signature requests across the consortium. BROA — the Blood Recommendation & Optimization Agent — ranks candidate sources by stock, distance, expiry score and chain reliability."
+        eyebrow={hospital ? hospital.short : "BloodLedger"}
+        title="Blood Requests & Transfers"
+        sub="View blood requests and track the movement of blood units between participating facilities."
         actions={
           <>
-            <Btn icon="filter" size="sm">All routes</Btn>
             {permissions.canCreateTransfer && (
-              <Btn kind="primary" icon="plus" onClick={() => setOpenWizard(true)}>
-                {permissions.canFullTransfer ? "New transfer" : "New request"}
+              <Btn
+                icon="plus"
+                onClick={() => setShowRequestForm(true)}
+              >
+                New Blood Request
               </Btn>
             )}
           </>
         }
       />
 
-      <div className="grid-dash">
-        <div className="card">
-          <div className="card-h">
-            <h3>Active & recent</h3>
-            <div className="actions row" style={{ gap: 6 }}>
-              {["ALL", "Pending", "Dispatched", "In Transit", "Delayed", "Rejected", "Compromised", "Received"].map((s) => (
-                <button key={s} className={`filter-chip ${filterStatus === s ? "active" : ""}`} onClick={() => setFilterStatus(s)}>
-                  {s === "ALL" ? "All" : s}
-                </button>
-              ))}
+      {/* Tabs */}
+      <div
+        className="row"
+        style={{
+          gap: 8,
+          marginBottom: 18,
+        }}
+      >
+        <button
+          className={`filter-chip ${
+            activeTab === "requests" ? "active" : ""
+          }`}
+          onClick={() => setActiveTab("requests")}
+        >
+          Blood Requests
+          <span className="count">
+            {requests.length}
+          </span>
+        </button>
+
+        <button
+          className={`filter-chip ${
+            activeTab === "transfers" ? "active" : ""
+          }`}
+          onClick={() => setActiveTab("transfers")}
+        >
+          Transfers
+          <span className="count">
+            {activeTransfers.length}
+          </span>
+        </button>
+      </div>
+
+      {/* ======================================================
+          NEW BLOOD REQUEST FORM
+          ====================================================== */}
+
+      {showRequestForm && (
+        <>
+          <div style={formCardStyle}>
+            {/* Form header */}
+            <div style={formHeaderStyle}>
+              <h3
+                style={{
+                  margin: 0,
+                  marginBottom: 4,
+                  fontSize: "16px",
+                  fontWeight: "600",
+                  color: "#161412",
+                }}
+              >
+                Create Blood Request
+              </h3>
+
+              <div
+                style={{
+                  fontSize: "13px",
+                  color: "#7b746c",
+                }}
+              >
+                Enter the basic details of the requested blood supply.
+              </div>
+            </div>
+
+            {/* Form body */}
+            <div style={formBodyStyle}>
+              <div style={fieldsGridStyle}>
+                {/* Blood Type */}
+                <div style={fieldGroupStyle}>
+                  <label style={labelStyle}>
+                    Blood Type
+                  </label>
+
+                  <select
+                    value={bloodType}
+                    onChange={(e) =>
+                      setBloodType(e.target.value)
+                    }
+                    style={inputStyle}
+                  >
+                    {window.BLOOD_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+
+                  <span style={helperStyle}>
+                    Select the required blood type.
+                  </span>
+                </div>
+
+                {/* Units */}
+                <div style={fieldGroupStyle}>
+                  <label style={labelStyle}>
+                    Units Needed
+                  </label>
+
+                  <input
+                    type="number"
+                    min="1"
+                    value={units}
+                    onChange={(e) =>
+                      setUnits(e.target.value)
+                    }
+                    style={inputStyle}
+                  />
+
+                  <span style={helperStyle}>
+                    Enter the number of units requested.
+                  </span>
+                </div>
+
+                {/* Priority */}
+                <div style={fieldGroupStyle}>
+                  <label style={labelStyle}>
+                    Priority
+                  </label>
+
+                  <select
+                    value={urgency}
+                    onChange={(e) =>
+                      setUrgency(e.target.value)
+                    }
+                    style={inputStyle}
+                  >
+                    <option value="Routine">
+                      Routine
+                    </option>
+
+                    <option value="Urgent">
+                      Urgent
+                    </option>
+
+                    <option value="Emergency">
+                      Emergency
+                    </option>
+                  </select>
+
+                  <span style={helperStyle}>
+                    Select the request priority.
+                  </span>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div
+                style={{
+                  ...fieldGroupStyle,
+                  marginTop: "22px",
+                }}
+              >
+                <label style={labelStyle}>
+                  Notes
+                  <span
+                    style={{
+                      marginLeft: "5px",
+                      fontWeight: "400",
+                      color: "#999189",
+                    }}
+                  >
+                    Optional
+                  </span>
+                </label>
+
+                <textarea
+                  placeholder="Add any additional information about this request..."
+                  value={note}
+                  onChange={(e) =>
+                    setNote(e.target.value)
+                  }
+                  style={textareaStyle}
+                />
+              </div>
+
+              {/* Form footer */}
+              <div style={footerStyle}>
+                <Btn
+                  kind="ghost"
+                  onClick={() => {
+                    setShowRequestForm(false);
+                    setNote("");
+                  }}
+                >
+                  Cancel
+                </Btn>
+
+                <Btn
+                  kind="primary"
+                  icon="check"
+                  onClick={createRequest}
+                >
+                  Submit Request
+                </Btn>
+              </div>
             </div>
           </div>
+
+          <div style={{ height: 18 }} />
+        </>
+      )}
+
+      {/* ======================================================
+          BLOOD REQUESTS
+          ====================================================== */}
+
+      {activeTab === "requests" && (
+        <div className="card">
+          <div className="card-h">
+            <div>
+              <h3>Blood Requests</h3>
+
+              <div className="sub muted">
+                Current requests recorded in the prototype.
+              </div>
+            </div>
+          </div>
+
           <div className="card-b flush">
             <table className="tbl">
-              <thead><tr>
-                <th>Tx ID</th><th>Type</th><th className="right">Units</th><th>From</th><th>To</th>
-                <th>Urgency</th><th>BROA</th><th>Status</th>
-              </tr></thead>
+              <thead>
+                <tr>
+                  <th>Request ID</th>
+                  <th>Blood Type</th>
+                  <th>Units</th>
+                  <th>Priority</th>
+                  <th>Requesting Facility</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+
               <tbody>
-                {filtered.map((t) => (
-                  <tr key={t.id} className="row-clickable" onClick={() => setSelectedId(t.id)}
-                      style={selected.id === t.id ? { background: "var(--bg-2)" } : null}>
-                    <td className="mono small">{t.id}</td>
-                    <td><BloodType type={t.type} /></td>
-                    <td className="right tnum">{t.units}</td>
-                    <td className="small">{hospitalById(t.from).short}</td>
-                    <td className="small">{hospitalById(t.to).short}</td>
-                    <td>
-                      <Chip kind={t.urgency === "Emergency" ? "critical" : t.urgency === "Urgent" ? "warn" : "neutral"} dot>
-                        {t.urgency}
-                      </Chip>
-                    </td>
-                    <td><span className="mono tnum">{t.broa}</span></td>
-                    <td>
-                      <Chip kind={transferStatusKind(t.status)} dot>
-                        {t.status}
-                      </Chip>
+                {requests.length > 0 ? (
+                  requests.map((item) => (
+                    <tr key={item.id}>
+                      <td className="mono small">
+                        {item.id}
+                      </td>
+
+                      <td>
+                        <BloodType
+                          type={item.type}
+                        />
+                      </td>
+
+                      <td className="tnum">
+                        {item.units}
+                      </td>
+
+                      <td>
+                        {item.urgency || "Routine"}
+                      </td>
+
+                      <td>
+                        {item.to
+                          ? hospitalById(item.to)?.short ||
+                            item.to
+                          : hospital?.short || "—"}
+                      </td>
+
+                      <td>
+                        <Chip
+                          kind={
+                            item.status === "Rejected"
+                              ? "critical"
+                              : item.status === "Approved"
+                              ? "ok"
+                              : "warn"
+                          }
+                          dot
+                        >
+                          {item.status || "Pending"}
+                        </Chip>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan="6"
+                      className="muted"
+                      style={{
+                        textAlign: "center",
+                        padding: 32,
+                      }}
+                    >
+                      No blood requests to display.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
         </div>
-
-        <TransferDetail tx={selected} permissions={permissions} onNav={onNav} />
-      </div>
-
-      {openWizard && (
-        <TransferWizard
-          hospital={hospital}
-          permissions={permissions}
-          prefill={prefill}
-          onClose={() => setOpenWizard(false)}
-          onCommit={(payload) => {
-            return onCommit && onCommit(payload);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-function TransferDetail({ tx, permissions, onNav }) {
-  const route = `${hospitalById(tx.from).short} → ${hospitalById(tx.to).short}`;
-  const statusKind = transferStatusKind(tx.status);
-  const exceptionLabel = ["Delayed", "Rejected", "Compromised", "Pending"].includes(tx.status) ? tx.status : null;
-  const exceptionKind = statusKind === "critical" ? "exception-critical" : statusKind === "warn" ? "exception-warn" : "exception-info";
-  return (
-    <div className="card">
-      <div className="card-h">
-        <h3 className="mono" style={{ fontFamily: "var(--font-mono)" }}>{tx.id}</h3>
-        <div className="actions">
-          <Chip kind={statusKind} dot>{tx.status}</Chip>
-        </div>
-      </div>
-      <div className="card-b">
-        <div className="row" style={{ gap: 16, alignItems: "center" }}>
-          <BloodType type={tx.type} lg />
-          <div>
-            <div className="serif" style={{ fontSize: 26, fontWeight: 500, letterSpacing: "-0.015em", lineHeight: 1 }}>
-              {tx.units} units
-            </div>
-            <div className="muted small" style={{ marginTop: 4 }}>{route}</div>
-          </div>
-        </div>
-
-        <div className="divider" />
-
-        <div className="stepper" style={{ marginBottom: 14 }}>
-            {[
-              { num: 1, nm: "Initiated", done: true },
-              { num: 2, nm: "Approved", done: ["Dispatched", "In Transit", "Delayed", "Received", "Compromised"].includes(tx.status) },
-              { num: 3, nm: "Dispatched", done: ["Dispatched", "In Transit", "Delayed", "Received", "Compromised"].includes(tx.status), active: tx.status === "Dispatched" },
-              { num: 4, nm: exceptionLabel || "In transit", done: ["Received"].includes(tx.status), active: ["In Transit", "Pending", "Delayed", "Rejected", "Compromised"].includes(tx.status), exception: exceptionLabel },
-              { num: 5, nm: "Received", done: tx.status === "Received", active: false },
-            ].map((s, i) => (
-            <div key={i} className={`step ${s.done ? "done" : ""} ${s.active ? "active" : ""} ${s.exception ? exceptionKind : ""}`}>
-              <div className="num">{s.done ? "✓" : s.num}</div>
-              <div className="nm">{s.nm}</div>
-            </div>
-          ))}
-        </div>
-
-        {exceptionLabel && (
-          <div className={`alert-card ${statusKind === "critical" ? "critical" : statusKind === "warn" ? "warn" : "info"}`} style={{ marginBottom: 14 }}>
-            <div>
-              <div className="title">Exception state: {exceptionLabel}</div>
-              <div className="desc">{tx.exception || (tx.status === "Pending" ? "Request queued for BROA review and source confirmation." : "Operational review required before this transfer can continue.")}</div>
-              <div className="meta"><span className="mono">{tx.tx_hash}</span></div>
-            </div>
-            <div className="quick">
-              {permissions.canFullTransfer && tx.status === "Rejected" && <Btn size="sm" kind="primary" icon="refresh" onClick={() => onNav("transfers", { type: tx.type, units: tx.units, urgency: tx.urgency })}>Re-route via BROA</Btn>}
-              {permissions.canFullTransfer && tx.status === "Delayed" && <Btn size="sm" icon="clock">Update ETA</Btn>}
-              {permissions.canApprove && tx.status === "Compromised" && <Btn size="sm" kind="primary" icon="shield">Quarantine sign-off</Btn>}
-            </div>
-          </div>
-        )}
-
-        <dl className="kv">
-          <dt>Urgency</dt><dd><Chip kind={tx.urgency === "Emergency" ? "critical" : tx.urgency === "Urgent" ? "warn" : "neutral"} dot>{tx.urgency}</Chip></dd>
-          <dt>BROA score</dt><dd className="mono tnum">{tx.broa} <span className="muted tiny">/ 1.00</span></dd>
-          <dt>Initiated</dt><dd className="mono small">{tx.initiated}</dd>
-          <dt>Completed</dt><dd className="mono small">{tx.completed || "—"}</dd>
-          <dt>Tx hash</dt>
-          <dd><span className="hash-chip">{tx.tx_hash}</span> <Btn size="sm" kind="ghost" icon="link" onClick={() => onNav("audit", { hash: tx.tx_hash })}>View on ledger</Btn></dd>
-          <dt>Signatures</dt>
-          <dd>
-            <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-              <Chip kind="ok" dot>Initiator · mtech.dela</Chip>
-              <Chip kind="ok" dot>Sender head · head.cruz</Chip>
-              {tx.status === "Received" && <Chip kind="ok" dot>Receiver · mtech.santos</Chip>}
-            </div>
-          </dd>
-        </dl>
-      </div>
-    </div>
-  );
-}
-
-// ───── Wizard ────────────────────────────────────────────────────────────
-function TransferWizard({ hospital, permissions, prefill, onClose, onCommit }) {
-  const requestOnly = !permissions.canFullTransfer;
-  const STEPS = requestOnly ? ["Request", "Confirm", "Sign", "Track"] : ["Request", "Source", "Validate", "Confirm", "Sign", "Track"];
-  const [step, setStep] = React.useState(0);
-  const [type, setType] = React.useState(prefill?.type || "O-");
-  const [units, setUnits] = React.useState(prefill?.units || 2);
-  const [urgency, setUrgency] = React.useState(prefill?.urgency || "Emergency");
-  const candidates = window.BROA_CANDIDATES[type] || window.BROA_CANDIDATES["O-"];
-  const [source, setSource] = React.useState(prefill?.from || candidates[0].hospital);
-  const [purpose, setPurpose] = React.useState("OR Schedule · Case 29481 · trauma laparotomy");
-  const [pin, setPin] = React.useState("");
-  const [submitted, setSubmitted] = React.useState(null);
-
-  const cand = candidates.find((c) => c.hospital === source) || candidates[0];
-  const confirmStep = requestOnly ? 1 : 3;
-  const signStep = requestOnly ? 2 : 4;
-  const trackStep = requestOnly ? 3 : 5;
-
-  const next = () => setStep((s) => Math.min(STEPS.length - 1, s + 1));
-  const prev = () => setStep((s) => Math.max(0, s - 1));
-
-  const commit = async () => {
-    const tx = await onCommit({
-      type, units, urgency,
-      from: requestOnly ? "PRC-LIP" : source,
-      to: hospital.id,
-      broa: cand.broa,
-      requestOnly,
-    });
-    setSubmitted(tx);
-    setStep(trackStep);
-  };
-
-  return (
-    <Modal
-      wide
-      title={step === STEPS.length - 1 ? (requestOnly ? "Transfer request queued" : "Transfer committed to ledger") : "New transfer request"}
-      sub={step === STEPS.length - 1 ? null : `Step ${step + 1} of ${STEPS.length - 1} · ${requestOnly ? "request-only" : "BROA-guided"}`}
-      onClose={onClose}
-      footer={
-        step === STEPS.length - 1 ? (
-          <Btn kind="primary" onClick={onClose}>Done</Btn>
-        ) : (
-          <>
-            <Btn kind="ghost" onClick={onClose}>Cancel</Btn>
-            {step > 0 && <Btn icon="chevronLeft" onClick={prev}>Back</Btn>}
-            {step < signStep && <Btn kind="primary" onClick={next} icon="arrowRight">Continue</Btn>}
-            {step === signStep && (
-              <Btn kind="primary" disabled={pin.length !== 6} onClick={commit}>
-                {requestOnly ? "Sign & queue request" : "Sign & submit"}
-              </Btn>
-            )}
-          </>
-        )
-      }
-    >
-      <div className="stepper" style={{ marginBottom: 18 }}>
-        {STEPS.map((s, i) => (
-          <div key={s} className={`step ${i < step ? "done" : ""} ${i === step ? "active" : ""}`}>
-            <div className="num">{i < step ? "✓" : i + 1}</div>
-            <div className="nm">{s}</div>
-          </div>
-        ))}
-      </div>
-
-      {step === 0 && (
-        <>
-          <div className="grid-2">
-            <div className="field">
-              <label>Blood type</label>
-              <select value={type} onChange={(e) => setType(e.target.value)}>
-                {BLOOD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label>Units</label>
-              <input type="number" min="1" max="20" value={units} onChange={(e) => setUnits(+e.target.value)} className="mono" />
-            </div>
-          </div>
-          <div style={{ height: 12 }} />
-          <div className="field">
-            <label>Urgency</label>
-            <div className="option-grid" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
-              {["Routine", "Urgent", "Emergency"].map((u) => (
-                <button type="button" key={u} className={`option ${urgency === u ? "selected" : ""}`} onClick={() => setUrgency(u)}>
-                  <div className="nm">{u}</div>
-                  <div className="sub">{u === "Emergency" ? "≤ 1h commit" : u === "Urgent" ? "≤ 4h commit" : "next routine batch"}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div style={{ height: 12 }} />
-          <div className="field">
-            <label>Purpose / case reference</label>
-            <input value={purpose} onChange={(e) => setPurpose(e.target.value)} />
-            <div className="hint">Links this request to your HIS case record. Stored as private metadata.</div>
-          </div>
-        </>
       )}
 
-      {step === 1 && !requestOnly && (
-        <>
-          <div className="muted small" style={{ marginBottom: 10 }}>
-            BROA scored {candidates.length} candidate{candidates.length > 1 ? "s" : ""} for {units} × <BloodType type={type} /> by stock, distance, expiry FEFO and chain reliability.
-          </div>
-          <table className="tbl" style={{ border: "1px solid var(--line)", borderRadius: 6 }}>
-            <thead>
-              <tr>
-                <th></th><th>Chapter</th><th className="right">Stock</th><th className="right">Distance</th>
-                <th>FEFO ISBT</th><th className="right">Expiry score</th><th className="right">BROA</th>
-              </tr>
-            </thead>
-            <tbody>
-              {candidates.map((c) => (
-                <tr key={c.hospital} className="row-clickable" onClick={() => setSource(c.hospital)}
-                    style={source === c.hospital ? { background: "var(--bg-2)" } : null}>
-                  <td>
-                    <input type="radio" name="src" checked={source === c.hospital} onChange={() => setSource(c.hospital)} />
-                  </td>
-                  <td>{hospitalById(c.hospital).short}</td>
-                  <td className="right tnum">{c.stock}</td>
-                  <td className="right tnum">{c.distance.toFixed(1)} km</td>
-                  <td className="mono small">{c.fefo_isbt}</td>
-                  <td className="right tnum">{c.expiry_score.toFixed(2)}</td>
-                  <td className="right">
-                    <span className="mono tnum" style={{ fontWeight: 600 }}>{c.broa.toFixed(2)}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      )}
+      {/* ======================================================
+          TRANSFERS
+          ====================================================== */}
 
-      {step === 2 && !requestOnly && (
-        <>
-          <div className="card" style={{ background: "var(--bg)", borderStyle: "dashed" }}>
-            <div className="card-b">
-              <div className="row" style={{ gap: 12 }}>
-                <I name="shield" size={20} />
-                <div>
-                  <div style={{ fontWeight: 600 }}>Pre-flight checks</div>
-                  <div className="muted small">Each runs as smart-contract validation before submission.</div>
+      {activeTab === "transfers" && (
+        <div className="grid-dash">
+          {/* Transfer list */}
+          <div className="card">
+            <div className="card-h">
+              <div>
+                <h3>Transfers</h3>
+
+                <div className="sub muted">
+                  Active and recent blood transfers.
                 </div>
               </div>
             </div>
+
+            <div className="card-b flush">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Transfer ID</th>
+                    <th>Blood Type</th>
+                    <th>Units</th>
+                    <th>From</th>
+                    <th>To</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {activeTransfers.length > 0 ? (
+                    activeTransfers.map((item) => (
+                      <tr
+                        key={item.id}
+                        className="row-clickable"
+                        style={
+                          selectedTransfer?.id === item.id
+                            ? {
+                                background: "#faf7f2",
+                              }
+                            : null
+                        }
+                        onClick={() =>
+                          setSelectedId(item.id)
+                        }
+                      >
+                        <td className="mono small">
+                          {item.id}
+                        </td>
+
+                        <td>
+                          <BloodType
+                            type={item.type}
+                          />
+                        </td>
+
+                        <td className="tnum">
+                          {item.units}
+                        </td>
+
+                        <td>
+                          {item.from
+                            ? hospitalById(item.from)?.short ||
+                              item.from
+                            : "—"}
+                        </td>
+
+                        <td>
+                          {item.to
+                            ? hospitalById(item.to)?.short ||
+                              item.to
+                            : "—"}
+                        </td>
+
+                        <td>
+                          <Chip
+                            kind={transferStatusKind(
+                              item.status
+                            )}
+                            dot
+                          >
+                            {item.status}
+                          </Chip>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan="6"
+                        className="muted"
+                        style={{
+                          textAlign: "center",
+                          padding: 32,
+                        }}
+                      >
+                        No transfers to display.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div style={{ height: 12 }} />
-          <div className="col" style={{ gap: 8 }}>
-            {[
-              ["Donor consent flag on source unit", true],
-              ["Crossmatch policy: deferred to receiving lab", true],
-              [`Cold-chain corridor available (${hospitalById(source).short} → ${hospital.short})`, true],
-              ["Source chapter holds ≥ requested units after dispatch", true],
-              ["No conflicting reservation on FEFO ISBT", true],
-              ["Receiver storage capacity confirmed", true],
-            ].map(([l, ok], i) => (
-              <div key={i} className="row" style={{ padding: "8px 12px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--surface)" }}>
-                <I name="check" size={14} />
-                <span style={{ flex: 1 }}>{l}</span>
-                <Chip kind="ok" dot>Pass</Chip>
+
+          {/* Transfer details */}
+          <div className="card">
+            <div className="card-h">
+              <div>
+                <h3>Transfer Details</h3>
+
+                <div className="sub muted">
+                  Basic information for the selected transfer.
+                </div>
               </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {step === confirmStep && (
-        <>
-          <div className="serif" style={{ fontSize: 22, fontWeight: 500, letterSpacing: "-0.01em", marginBottom: 8 }}>
-            Review and confirm
-          </div>
-          <dl className="kv">
-            <dt>Product</dt><dd><BloodType type={type} /> · {units} units PRBC</dd>
-            <dt>From</dt><dd>{requestOnly ? "BROA queue · source pending" : hospitalById(source).name}</dd>
-            <dt>To</dt><dd>{hospital.name}</dd>
-            <dt>FEFO unit</dt><dd className="mono small">{requestOnly ? "Assigned after source confirmation" : cand.fefo_isbt}</dd>
-            <dt>Urgency</dt><dd><Chip kind={urgency === "Emergency" ? "critical" : urgency === "Urgent" ? "warn" : "neutral"} dot>{urgency}</Chip></dd>
-            <dt>BROA score</dt><dd className="mono tnum">{requestOnly ? "Pending BROA run" : `${cand.broa.toFixed(2)} / 1.00`}</dd>
-            <dt>Purpose</dt><dd className="small">{purpose}</dd>
-            <dt>Couriers</dt><dd>{requestOnly ? "Assigned by primary node after approval" : "PRC Lipa · ID #2 · ETA 38 min"}</dd>
-            <dt>Chaincode</dt><dd className="mono small">transfer-cc · v2.4.1</dd>
-          </dl>
-        </>
-      )}
-
-      {step === signStep && (
-        <>
-          <div className="muted small" style={{ marginBottom: 12 }}>
-            {requestOnly
-              ? "Authorize with your role PIN. This queues a request for the primary node and BROA review; it does not reserve stock directly."
-              : "Authorize with your role PIN. As Blood Bank Head this submits the transaction to the ordering service; the source chapter will be notified to co-sign."}
-          </div>
-          <div className="grid-2">
-            <div className="field">
-              <label>Signer</label>
-              <input value="head.reyes@mmc.bloodledger" readOnly />
             </div>
-            <div className="field">
-              <label>6-digit PIN</label>
-              <input value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                     className="mono" placeholder="• • • • • •" autoFocus />
-            </div>
-          </div>
-          <div style={{ height: 12 }} />
-          <div className="card" style={{ background: "var(--bg)" }}>
+
             <div className="card-b">
-              <div className="muted tiny" style={{ letterSpacing: "0.12em", textTransform: "uppercase" }}>Endorsement policy</div>
-              <div className="mono small" style={{ marginTop: 4 }}>
-                AND( 'MMCMSP.member', 'PRCMSP.member' ) — both peers must endorse.
-              </div>
+              {!selectedTransfer ? (
+                <div
+                  className="muted"
+                  style={{
+                    textAlign: "center",
+                    padding: 30,
+                  }}
+                >
+                  Select a transfer to view its details.
+                </div>
+              ) : (
+                <>
+                  <div
+                    className="row"
+                    style={{
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div>
+                      <div className="mono">
+                        {selectedTransfer.id}
+                      </div>
+
+                      <div className="muted small">
+                        Transfer record
+                      </div>
+                    </div>
+
+                    <Chip
+                      kind={transferStatusKind(
+                        selectedTransfer.status
+                      )}
+                      dot
+                    >
+                      {selectedTransfer.status}
+                    </Chip>
+                  </div>
+
+                  <div className="divider" />
+
+                  <dl className="kv">
+                    <dt>Blood Type</dt>
+
+                    <dd>
+                      <BloodType
+                        type={selectedTransfer.type}
+                      />
+                    </dd>
+
+                    <dt>Units</dt>
+
+                    <dd>
+                      {selectedTransfer.units}
+                    </dd>
+
+                    <dt>From</dt>
+
+                    <dd>
+                      {selectedTransfer.from
+                        ? hospitalById(
+                            selectedTransfer.from
+                          )?.name ||
+                          selectedTransfer.from
+                        : "—"}
+                    </dd>
+
+                    <dt>To</dt>
+
+                    <dd>
+                      {selectedTransfer.to
+                        ? hospitalById(
+                            selectedTransfer.to
+                          )?.name ||
+                          selectedTransfer.to
+                        : "—"}
+                    </dd>
+
+                    <dt>Priority</dt>
+
+                    <dd>
+                      {selectedTransfer.urgency ||
+                        "Routine"}
+                    </dd>
+
+                    <dt>Started</dt>
+
+                    <dd className="mono small">
+                      {selectedTransfer.initiated ||
+                        "—"}
+                    </dd>
+
+                    <dt>Completed</dt>
+
+                    <dd className="mono small">
+                      {selectedTransfer.completed ||
+                        "—"}
+                    </dd>
+                  </dl>
+
+                  <div className="divider" />
+
+                  <div>
+                    <div
+                      className="small"
+                      style={{
+                        marginBottom: 10,
+                      }}
+                    >
+                      Transfer Progress
+                    </div>
+
+                    <SimpleTransferProgress
+                      status={selectedTransfer.status}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
-        </>
+        </div>
       )}
 
-      {step === trackStep && (
-        <>
-          <div className="row" style={{ gap: 12, alignItems: "flex-start" }}>
-            <div className="brand-mark" style={{ width: 40, height: 40, fontSize: 22, background: "var(--ok)" }}>✓</div>
+      <div style={{ height: 18 }} />
+
+      {/* Prototype notice */}
+      <div className="card">
+        <div className="card-b">
+          <div
+            className="row"
+            style={{ gap: 12 }}
+          >
+            <I
+              name="info"
+              size={16}
+            />
+
             <div>
-              <div className="serif" style={{ fontSize: 24, fontWeight: 500, letterSpacing: "-0.015em" }}>
-                {requestOnly ? "Request queued." : "Committed to ledger."}
+              <div className="small">
+                Prototype workflow
               </div>
-              <div className="muted">Block 124,893 · tx 0xfc81…aa92</div>
+
+              <div className="muted tiny">
+                Request approval rules, transfer responsibilities,
+                prioritization logic, routing decisions, and
+                hospital-specific procedures will be refined after
+                stakeholder validation.
+              </div>
             </div>
           </div>
-          <div style={{ height: 14 }} />
-          <dl className="kv">
-            <dt>Tx ID</dt><dd className="mono">{submitted?.id || "Pending"}</dd>
-            <dt>Status</dt><dd><Chip kind="info" dot>{requestOnly ? "Pending" : "Awaiting dispatch"}</Chip></dd>
-            <dt>Notified</dt><dd>{requestOnly ? "Mary Mediatrix primary node · BROA queue" : "head.cruz@prc-lipa.bloodledger · courier dispatch"}</dd>
-            <dt>ETA</dt><dd>{requestOnly ? "Assigned after approval" : "~ 38 minutes"}</dd>
-          </dl>
-        </>
-      )}
-    </Modal>
+        </div>
+      </div>
+    </div>
   );
 }
 
-Object.assign(window, { TransfersPage, TransferWizard });
+
+/* =========================================================
+   SIMPLE TRANSFER PROGRESS
+   ========================================================= */
+
+function SimpleTransferProgress({ status }) {
+  const normalized = String(status || "").toLowerCase();
+
+  let currentStep = 1;
+
+  if (
+    normalized.includes("approved") ||
+    normalized.includes("dispatch")
+  ) {
+    currentStep = 2;
+  }
+
+  if (
+    normalized.includes("transit") ||
+    normalized.includes("delayed")
+  ) {
+    currentStep = 3;
+  }
+
+  if (
+    normalized.includes("received") ||
+    normalized.includes("completed")
+  ) {
+    currentStep = 4;
+  }
+
+  const steps = [
+    "Requested",
+    "Approved",
+    "In Transit",
+    "Received",
+  ];
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(4, 1fr)",
+        gap: 8,
+      }}
+    >
+      {steps.map((step, index) => {
+        const done = index + 1 <= currentStep;
+
+        return (
+          <div
+            key={step}
+            style={{
+              padding: "10px 8px",
+              border: done
+                ? "1px solid #cfc6bc"
+                : "1px solid #e4dfd8",
+              borderRadius: 8,
+              background: done
+                ? "#f7f3ee"
+                : "#ffffff",
+              textAlign: "center",
+            }}
+          >
+            <div
+              className="small"
+              style={{
+                fontWeight: done ? 600 : 400,
+                color: done
+                  ? "#36312d"
+                  : "#948c84",
+              }}
+            >
+              {done ? "✓ " : ""}
+              {step}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+
+Object.assign(window, {
+  TransfersPage,
+  SimpleTransferProgress,
+});

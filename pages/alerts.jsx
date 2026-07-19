@@ -1,83 +1,319 @@
-// pages/alerts.jsx — Alert center, wired to Transfers
+// pages/alerts.jsx
+// Simplified BloodLedger alert center.
+//
+// This version removes blockchain peer terminology, ledger links,
+// subscription controls, detailed threshold rules, and algorithm-specific
+// recommendations.
+//
+// Alert behavior and hospital-specific escalation rules can be refined
+// after stakeholder validation.
 
 function AlertsPage({ permissions, onAct, onNav }) {
+  const alerts = window.ALERTS || [];
+
   const [filter, setFilter] = React.useState("all");
-  const counts = window.ALERTS.reduce((a, c) => ((a[c.severity] = (a[c.severity] || 0) + 1), a), {});
-  const filtered = filter === "all" ? window.ALERTS : window.ALERTS.filter((a) => a.severity === filter);
+
+  const counts = alerts.reduce((result, alert) => {
+    const severity = alert.severity || "info";
+
+    result[severity] =
+      (result[severity] || 0) + 1;
+
+    return result;
+  }, {});
+
+  const filtered =
+    filter === "all"
+      ? alerts
+      : alerts.filter(
+          (alert) =>
+            alert.severity === filter
+        );
 
   return (
     <div className="page">
       <PageHead
-        eyebrow="BROA · Threshold monitors · Cold-chain"
-        title="Alert Center"
-        sub="Smart-contract alerts from your peer and the consortium. Each recommendation is one click away from a multi-sig transfer."
-        actions={
-          <>
-            <Btn icon="bell" size="sm">Subscriptions</Btn>
-            <Btn icon="settings" size="sm">Threshold rules</Btn>
-          </>
-        }
+        eyebrow="BloodLedger"
+        title="Alerts"
+        sub="View important inventory and system notifications."
       />
 
-      <div className="card" style={{ marginBottom: 16 }}>
+      {/* Summary */}
+      <div className="stat-grid">
+        <Stat
+          label="All Alerts"
+          value={alerts.length}
+          unit=""
+        />
+
+        <Stat
+          label="Critical"
+          value={counts.critical || 0}
+          unit=""
+          accent="critical"
+        />
+
+        <Stat
+          label="Warnings"
+          value={counts.warn || 0}
+          unit=""
+          accent="warn"
+        />
+
+        <Stat
+          label="Information"
+          value={counts.info || 0}
+          unit=""
+          accent="info"
+        />
+      </div>
+
+      <div style={{ height: 18 }} />
+
+      <div className="card">
+        {/* Filters */}
         <div className="filters">
           {[
-            ["all", "All", window.ALERTS.length],
-            ["critical", "Critical", counts.critical || 0],
-            ["warn", "Low cover", counts.warn || 0],
-            ["info", "Informational", counts.info || 0],
-          ].map(([k, l, n]) => (
-            <button key={k} className={`filter-chip ${filter === k ? "active" : ""}`} onClick={() => setFilter(k)}>
-              {l} <span className="count">{n}</span>
-            </button>
-          ))}
-          <div style={{ marginLeft: "auto" }} className="muted small">
-            <span className="live-dot" /> Streaming from <span className="mono">peer0.mmc</span>
-          </div>
+            [
+              "all",
+              "All",
+              alerts.length,
+            ],
+            [
+              "critical",
+              "Critical",
+              counts.critical || 0,
+            ],
+            [
+              "warn",
+              "Warnings",
+              counts.warn || 0,
+            ],
+            [
+              "info",
+              "Information",
+              counts.info || 0,
+            ],
+          ].map(
+            ([key, label, count]) => (
+              <button
+                key={key}
+                className={`filter-chip ${
+                  filter === key
+                    ? "active"
+                    : ""
+                }`}
+                onClick={() =>
+                  setFilter(key)
+                }
+              >
+                {label}
+
+                <span className="count">
+                  {count}
+                </span>
+              </button>
+            )
+          )}
+        </div>
+
+        {/* Alert list */}
+        <div
+          className="card-b"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+          }}
+        >
+          {filtered.length > 0 ? (
+            filtered.map((alert) => {
+              const severity =
+                alert.severity ||
+                "info";
+
+              const chipKind =
+                severity === "critical"
+                  ? "solid-critical"
+                  : severity === "warn"
+                  ? "warn"
+                  : "info";
+
+              return (
+                <div
+                  key={alert.id}
+                  className={`alert-card ${severity}`}
+                >
+                  <div
+                    className="row"
+                    style={{
+                      justifyContent:
+                        "space-between",
+                      alignItems:
+                        "flex-start",
+                      gap: 16,
+                    }}
+                  >
+                    <div
+                      style={{
+                        flex: 1,
+                      }}
+                    >
+                      <div
+                        className="row"
+                        style={{
+                          gap: 8,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <span
+                          className={`chip ${chipKind}`}
+                          style={
+                            severity ===
+                            "critical"
+                              ? {
+                                  color:
+                                    "#fff",
+                                }
+                              : null
+                          }
+                        >
+                          {severity.toUpperCase()}
+                        </span>
+
+                        {alert.when && (
+                          <span className="muted tiny">
+                            <I
+                              name="clock"
+                              size={11}
+                            />{" "}
+                            {alert.when}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="title">
+                        {alert.title ||
+                          "System Alert"}
+                      </div>
+
+                      <div className="desc">
+                        {alert.desc ||
+                          "No additional information available."}
+                      </div>
+
+                      {alert.source && (
+                        <div
+                          className="muted tiny"
+                          style={{
+                            marginTop: 8,
+                          }}
+                        >
+                          Source:{" "}
+                          {alert.source}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Keep actions intentionally simple */}
+                    <div
+                      className="actions"
+                      style={{
+                        flexShrink: 0,
+                      }}
+                    >
+                      {alert.actions &&
+                        alert.actions
+                          .slice(0, 1)
+                          .map(
+                            (
+                              action,
+                              index
+                            ) => (
+                              <Btn
+                                key={
+                                  index
+                                }
+                                size="sm"
+                                kind={
+                                  action.kind ===
+                                  "primary"
+                                    ? "primary"
+                                    : "ghost"
+                                }
+                                onClick={() => {
+                                  if (
+                                    action.goto &&
+                                    onAct
+                                  ) {
+                                    onAct(
+                                      action
+                                    );
+                                  }
+                                }}
+                              >
+                                {
+                                  action.label
+                                }
+                              </Btn>
+                            )
+                          )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div
+              className="muted"
+              style={{
+                textAlign: "center",
+                padding: 32,
+              }}
+            >
+              No alerts match the
+              selected filter.
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="col" style={{ gap: 12 }}>
-        {filtered.map((a) => (
-          <div key={a.id} className={`alert-card ${a.severity}`}>
+      <div style={{ height: 18 }} />
+
+      {/* Prototype notice */}
+      <div className="card">
+        <div className="card-b">
+          <div
+            className="row"
+            style={{ gap: 12 }}
+          >
+            <I
+              name="info"
+              size={16}
+            />
+
             <div>
-              <div className="row" style={{ gap: 10, alignItems: "center" }}>
-                <span className={`chip ${a.severity === "critical" ? "solid-critical" : a.severity === "warn" ? "warn" : a.severity === "ok" ? "ok" : "info"}`}
-                      style={a.severity === "critical" ? { color: "#fff" } : null}>
-                  {a.severity.toUpperCase()}
-                </span>
-                <span className="mono tiny muted">{a.id}</span>
-                <span className="muted small">·</span>
-                <span className="muted small"><I name="clock" size={11} /> {a.when}</span>
+              <div className="small">
+                Prototype alert system
               </div>
-              <div className="title" style={{ fontSize: 16, marginTop: 8, fontFamily: "var(--font-display)", fontWeight: 500, letterSpacing: "-0.01em" }}>
-                {a.title}
+
+              <div className="muted tiny">
+                Alert types,
+                notification thresholds,
+                escalation procedures, and
+                required user actions are
+                placeholders and may change
+                after consultation with
+                hospital stakeholders.
               </div>
-              <div className="desc">{a.desc}</div>
-              <div className="meta">
-                <span>{a.source}</span>
-              </div>
-              <div className="rec">
-                <strong>{a.rec_label}.</strong> {a.rec}
-              </div>
-            </div>
-            <div className="quick">
-              {a.actions.filter((act) => {
-                if (act.kind === "primary") return permissions.canCreateTransfer;
-                return permissions.canAcknowledge;
-              }).map((act, i) => (
-                <Btn key={i} kind={act.kind === "primary" ? "primary" : "ghost"} size="sm" icon={act.kind === "primary" ? "arrowRight" : undefined}
-                     onClick={() => act.goto ? onAct(act) : null}>
-                  {act.label}
-                </Btn>
-              ))}
-              <Btn size="sm" kind="ghost" onClick={() => onNav("audit", { alert: a.id })}>View on ledger</Btn>
             </div>
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );
 }
 
-Object.assign(window, { AlertsPage });
+Object.assign(window, {
+  AlertsPage,
+});
