@@ -1,7 +1,4 @@
 // components.jsx — shared chrome (Sidebar, Topbar, Icons, helpers)
-//
-// Simplified base mock-up version.
-// User-facing blockchain/network implementation details have been reduced.
 
 const HOSPITALS =
   window.HOSPITALS;
@@ -10,9 +7,7 @@ const BLOOD_TYPES =
   window.BLOOD_TYPES;
 
 
-// =========================================================
-// ICONS
-// =========================================================
+// ───── Tiny SVG icons ─────────────────────────────────────
 
 const Icon = ({
   d,
@@ -22,60 +17,25 @@ const Icon = ({
   sw = 1.6,
   vb = "0 0 24 24"
 }) => (
-
   <svg
-
-    width={
-      size
-    }
-
-    height={
-      size
-    }
-
-    viewBox={
-      vb
-    }
-
-    fill={
-      fill
-    }
-
-    stroke={
-      stroke
-    }
-
-    strokeWidth={
-      sw
-    }
-
+    width={size}
+    height={size}
+    viewBox={vb}
+    fill={fill}
+    stroke={stroke}
+    strokeWidth={sw}
     strokeLinecap="round"
-
     strokeLinejoin="round"
-
     aria-hidden="true"
-
   >
-
-    {
-      typeof d ===
-      "string"
-
-        ? (
-          <path
-            d={d}
-          />
-        )
-
-        : d
-    }
-
+    {typeof d === "string"
+      ? <path d={d} />
+      : d}
   </svg>
 );
 
 
 const ICONS = {
-
   dashboard:
     "M3 13h8V3H3v10Zm0 8h8v-6H3v6Zm10 0h8V11h-8v10Zm0-18v6h8V3h-8Z",
 
@@ -94,20 +54,16 @@ const ICONS = {
   audit:
     "M5 4h11l3 3v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm3 8h8M8 16h6M8 8h5",
 
+  reporting:
+    "M4 20V10m6 10V4m6 16v-7m6 7V8",
+
   settings:
     "M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm8.5 4l1.5-1.2-2-3.4-1.8.6a8 8 0 0 0-2.1-1.2L15.5 5h-7l-.6 1.8a8 8 0 0 0-2.1 1.2l-1.8-.6-2 3.4L3.5 12 2 13.2l2 3.4 1.8-.6a8 8 0 0 0 2.1 1.2L8.5 19h7l.6-1.8a8 8 0 0 0 2.1-1.2l1.8.6 2-3.4L20.5 12Z",
 
   search:
     <>
-      <circle
-        cx="11"
-        cy="11"
-        r="7"
-      />
-
-      <path
-        d="m16.5 16.5 4 4"
-      />
+      <circle cx="11" cy="11" r="7" />
+      <path d="m16.5 16.5 4 4" />
     </>,
 
   chevron:
@@ -187,21 +143,10 @@ const ICONS = {
 
   info:
     <>
-      <circle
-        cx="12"
-        cy="12"
-        r="9"
-      />
-
-      <path
-        d="M12 11v5"
-      />
-
-      <path
-        d="M12 8h.01"
-      />
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5" />
+      <path d="M12 8h.01" />
     </>,
-
 };
 
 
@@ -210,60 +155,34 @@ const I = ({
   size,
   sw
 }) => (
-
   <Icon
-
-    d={
-      ICONS[name]
-    }
-
-    size={
-      size
-    }
-
-    sw={
-      sw
-    }
-
+    d={ICONS[name]}
+    size={size}
+    sw={sw}
   />
-
 );
 
 
-// =========================================================
-// SMALL UI COMPONENTS
-// =========================================================
+// ───── Small UI bits ──────────────────────────────────────
 
 function BloodType({
   type,
   lg
 }) {
-
   const neg =
     type &&
     type.endsWith("-");
 
-
   return (
-
     <span
-      className={
-        `bt ${
-          lg
-            ? "lg"
-            : ""
-        } ${
-          neg
-            ? "neg"
-            : "pos"
-        }`
-      }
+      className={`bt ${
+        lg ? "lg" : ""
+      } ${
+        neg ? "neg" : "pos"
+      }`}
     >
-
       {type}
-
     </span>
-
   );
 }
 
@@ -274,31 +193,18 @@ function Chip({
   dot,
   outline
 }) {
-
   return (
-
     <span
-      className={
-        `chip ${kind} ${
-          outline
-            ? "outline"
-            : ""
-        }`
-      }
+      className={`chip ${kind} ${
+        outline ? "outline" : ""
+      }`}
     >
-
       {dot && (
-
-        <span
-          className="chip-dot"
-        />
-
+        <span className="chip-dot" />
       )}
 
       {children}
-
     </span>
-
   );
 }
 
@@ -306,9 +212,7 @@ function Chip({
 function StatusChip({
   status
 }) {
-
   const map = {
-
     critical: [
       "critical",
       "Critical"
@@ -328,9 +232,7 @@ function StatusChip({
       "info",
       "Surplus"
     ],
-
   };
-
 
   const [
     k,
@@ -342,18 +244,13 @@ function StatusChip({
       status
     ];
 
-
   return (
-
     <Chip
       kind={k}
       dot
     >
-
       {label}
-
     </Chip>
-
   );
 }
 
@@ -369,132 +266,101 @@ function Btn({
   title,
   ariaLabel
 }) {
-
   const cls =
-
     kind === "primary"
-
       ? "btn btn-primary"
-
       : kind === "ghost"
-
       ? "btn btn-ghost"
-
       : "btn";
 
-
   const sz =
-
     size === "sm"
-
       ? "btn-sm"
-
       : size === "lg"
-
       ? "btn-lg"
-
       : "";
 
-
   return (
-
     <button
-
-      className={
-        `${cls} ${sz}`
-      }
-
-      onClick={
-        onClick
-      }
-
-      disabled={
-        disabled
-      }
-
-      type={
-        type ||
-        "button"
-      }
-
-      title={
-        title
-      }
-
+      className={`${cls} ${sz}`}
+      onClick={onClick}
+      disabled={disabled}
+      type={type || "button"}
+      title={title}
       aria-label={
         ariaLabel ||
         title
       }
-
     >
-
       {icon && (
-
         <I
           name={icon}
           size={14}
         />
-
       )}
 
       {children}
-
     </button>
-
   );
 }
 
 
-// =========================================================
-// PERMISSIONS
-// =========================================================
+// ───── Permissions ─────────────────────────────────────────
 
-function roleKey(role) {
-
+function roleKey(
+  role
+) {
   const r =
     String(
       role ||
       ""
-    )
-      .toUpperCase();
-
+    ).toUpperCase();
 
   if (
-    r.includes("DOH") ||
-    r.includes("REGULATOR")
+    r.includes(
+      "DOH"
+    ) ||
+    r.includes(
+      "REGULATOR"
+    )
   ) {
     return "regulator";
   }
 
-
   if (
-    r.includes("PRC")
+    r.includes(
+      "PRC"
+    )
   ) {
     return "prc";
   }
 
-
   if (
-    r.includes("BLOOD BANK HEAD") ||
-    r.includes("HOSPITAL ADMIN")
+    r.includes(
+      "BLOOD BANK HEAD"
+    ) ||
+    r.includes(
+      "HOSPITAL ADMIN"
+    )
   ) {
     return "admin";
   }
 
-
   if (
-    r.includes("TECHNOLOGIST")
+    r.includes(
+      "TECHNOLOGIST"
+    )
   ) {
     return "technologist";
   }
 
-
   if (
-    r.includes("SYSTEM")
+    r.includes(
+      "SYSTEM"
+    )
   ) {
     return "system";
   }
-
 
   return "readonly";
 }
@@ -503,11 +369,8 @@ function roleKey(role) {
 function isSecondaryHospital(
   hospital
 ) {
-
   return (
-
     !!hospital &&
-
     ![
       "MMC-LIP",
       "PRC-LIP",
@@ -515,7 +378,6 @@ function isSecondaryHospital(
     ].includes(
       hospital.id
     )
-
   );
 }
 
@@ -523,26 +385,23 @@ function isSecondaryHospital(
 function buildPermissions(
   session
 ) {
-
   const key =
     roleKey(
       session?.user?.role
     );
-
 
   const secondary =
     isSecondaryHospital(
       session?.hospital
     );
 
-
   const readOnly =
-    key === "regulator" ||
-    key === "prc";
-
+    key ===
+      "regulator" ||
+    key ===
+      "prc";
 
   return {
-
     roleKey:
       key,
 
@@ -574,7 +433,6 @@ function buildPermissions(
 
     canAcknowledge:
       !readOnly,
-
   };
 }
 
@@ -582,14 +440,11 @@ function buildPermissions(
 function transferStatusKind(
   status
 ) {
-
   const s =
     String(
       status ||
       ""
-    )
-      .toLowerCase();
-
+    ).toLowerCase();
 
   if (
     s === "received" ||
@@ -598,7 +453,6 @@ function transferStatusKind(
     return "ok";
   }
 
-
   if (
     s === "delayed" ||
     s === "in transit"
@@ -606,14 +460,12 @@ function transferStatusKind(
     return "warn";
   }
 
-
   if (
     s === "rejected" ||
     s === "compromised"
   ) {
     return "critical";
   }
-
 
   if (
     s === "pending" ||
@@ -624,31 +476,26 @@ function transferStatusKind(
     return "info";
   }
 
-
   return "neutral";
 }
 
 
-// =========================================================
-// SIDEBAR
-// =========================================================
+// ───── Sidebar ─────────────────────────────────────────────
 
 function Sidebar({
   active,
   onNav,
   user,
   hospital,
-  badges = {}
+  badges = {},
+  permissions
 }) {
-
   const sections = [
-
     {
       label:
         "Overview",
 
       items: [
-
         {
           id:
             "dashboard",
@@ -659,17 +506,14 @@ function Sidebar({
           icon:
             "dashboard",
         },
-
       ],
     },
-
 
     {
       label:
         "Inventory",
 
       items: [
-
         {
           id:
             "inventory",
@@ -681,7 +525,6 @@ function Sidebar({
             "inventory",
         },
 
-
         {
           id:
             "scanner",
@@ -692,17 +535,14 @@ function Sidebar({
           icon:
             "scanner",
         },
-
       ],
     },
-
 
     {
       label:
         "Requests & Activity",
 
       items: [
-
         {
           id:
             "transfers",
@@ -716,7 +556,6 @@ function Sidebar({
           badge:
             badges.transfers,
         },
-
 
         {
           id:
@@ -735,7 +574,6 @@ function Sidebar({
             "blood",
         },
 
-
         {
           id:
             "audit",
@@ -746,294 +584,196 @@ function Sidebar({
           icon:
             "audit",
         },
-
       ],
     },
 
+    {
+      label:
+        "Compliance",
+
+      items: [
+        {
+          id:
+            "reporting",
+
+          name:
+            "Compliance Reports",
+
+          icon:
+            "reporting",
+        },
+      ],
+    },
   ];
 
 
   return (
-
-    <aside
-      className="sidebar"
-    >
-
-      {/* Brand */}
-      <div
-        className="brand"
-      >
-
-        <div
-          className="brand-mark"
-        >
+    <aside className="sidebar">
+      <div className="brand">
+        <div className="brand-mark">
           B
         </div>
 
-
         <div>
-
-          <div
-            className="brand-name"
-          >
-
+          <div className="brand-name">
             Blood
             <em>
               ledger
             </em>
-
           </div>
 
-
-          <div
-            className="brand-sub"
-          >
+          <div className="brand-sub">
             Blood Inventory Management
           </div>
-
         </div>
-
       </div>
 
 
-      {/* Current hospital */}
-      <div
-        className="hospital-pill"
-      >
-
-        <div
-          className="label"
-        >
+      <div className="hospital-pill">
+        <div className="label">
           Current Facility
         </div>
 
-
-        <div
-          className="name"
-        >
-          {
-            hospital?.short ||
-            "Hospital"
-          }
+        <div className="name">
+          {hospital?.short ||
+            "Hospital"}
         </div>
 
-
-        <div
-          className="meta"
-        >
-
-          <span
-            className="peer-dot"
-          />
+        <div className="meta">
+          <span className="peer-dot" />
 
           <span>
             Active session
           </span>
-
         </div>
-
       </div>
 
 
-      {/* Navigation */}
-      <nav
-        className="nav"
-      >
-
-        {
-          sections.map(
-            (section) => (
-
-              <React.Fragment
-                key={
+      <nav className="nav">
+        {sections.map(
+          (
+            section
+          ) => (
+            <React.Fragment
+              key={
+                section.label
+              }
+            >
+              <div className="nav-section-label">
+                {
                   section.label
                 }
-              >
+              </div>
 
-                <div
-                  className="nav-section-label"
-                >
+              {section.items.map(
+                (
+                  item
+                ) => (
+                  <button
+                    key={
+                      item.id
+                    }
 
-                  {
-                    section.label
-                  }
+                    className={`nav-item ${
+                      active ===
+                      item.id
+                        ? "active"
+                        : ""
+                    }`}
 
-                </div>
-
-
-                {
-                  section.items.map(
-                    (item) => (
-
-                      <button
-
-                        key={
-                          item.id
+                    onClick={() =>
+                      onNav(
+                        item.id
+                      )
+                    }
+                  >
+                    <span className="nav-ico">
+                      <I
+                        name={
+                          item.icon
                         }
+                        size={16}
+                      />
+                    </span>
 
-                        className={
-                          `nav-item ${
-                            active ===
-                            item.id
+                    {
+                      item.name
+                    }
 
-                              ? "active"
-
-                              : ""
-                          }`
-                        }
-
-                        onClick={() =>
-                          onNav(
-                            item.id
-                          )
-                        }
-
-                      >
-
+                    {item.badge
+                      ? (
                         <span
-                          className="nav-ico"
+                          className={`badge ${
+                            item.badgeKind ===
+                            "blood"
+                              ? ""
+                              : "dim"
+                          }`}
                         >
-
-                          <I
-
-                            name={
-                              item.icon
-                            }
-
-                            size={16}
-
-                          />
-
+                          {
+                            item.badge
+                          }
                         </span>
-
-
-                        {
-                          item.name
-                        }
-
-
-                        {
-                          item.badge
-                            ? (
-
-                              <span
-                                className={
-                                  `badge ${
-                                    item.badgeKind ===
-                                    "blood"
-
-                                      ? ""
-
-                                      : "dim"
-                                  }`
-                                }
-                              >
-
-                                {
-                                  item.badge
-                                }
-
-                              </span>
-
-                            )
-
-                            : null
-                        }
-
-                      </button>
-
-                    )
-                  )
-                }
-
-              </React.Fragment>
-
-            )
+                      )
+                      : null}
+                  </button>
+                )
+              )}
+            </React.Fragment>
           )
-        }
-
+        )}
       </nav>
 
 
-      {/* User */}
-      <div
-        className="sidebar-foot"
-      >
-
-        <div
-          className="user-avatar"
-        >
-
+      <div className="sidebar-foot">
+        <div className="user-avatar">
           {
             user.initials
           }
-
         </div>
-
 
         <div
           style={{
-            flex: 1,
-            minWidth: 0,
+            flex:
+              1,
+
+            minWidth:
+              0,
           }}
         >
-
-          <div
-            className="user-name"
-          >
-
+          <div className="user-name">
             {
               user.name
             }
-
           </div>
 
-
-          <div
-            className="user-role"
-          >
-
+          <div className="user-role">
             {
               user.role
             }
-
           </div>
-
         </div>
 
-
         <button
-
           className="btn btn-ghost btn-sm"
-
           onClick={
             user.onLogout
           }
-
           title="Sign out"
-
           aria-label="Sign out"
-
         >
-
           <I
             name="exit"
             size={14}
           />
-
         </button>
-
       </div>
-
     </aside>
-
   );
 }
 
 
-// =========================================================
-// TOPBAR
-// =========================================================
+// ───── Topbar ──────────────────────────────────────────────
 
 function Topbar({
   crumbs,
@@ -1041,123 +781,70 @@ function Topbar({
   onSearch,
   right
 }) {
-
   return (
+    <div className="topbar">
+      <div className="crumbs">
+        {crumbs.map(
+          (
+            c,
+            i
+          ) => (
+            <React.Fragment
+              key={i}
+            >
+              {i >
+                0 && (
+                <span className="sep">
+                  /
+                </span>
+              )}
 
-    <div
-      className="topbar"
-    >
-
-      {/* Breadcrumbs */}
-      <div
-        className="crumbs"
-      >
-
-        {
-          crumbs.map(
-            (
-              crumb,
-              index
-            ) => (
-
-              <React.Fragment
-                key={
-                  index
+              <span
+                className={
+                  i ===
+                  crumbs.length -
+                    1
+                    ? "current"
+                    : ""
                 }
               >
-
-                {
-                  index >
-                    0 && (
-
-                    <span
-                      className="sep"
-                    >
-                      /
-                    </span>
-
-                  )
-                }
-
-
-                <span
-
-                  className={
-                    index ===
-                    crumbs.length -
-                    1
-
-                      ? "current"
-
-                      : ""
-                  }
-
-                >
-
-                  {
-                    crumb
-                  }
-
-                </span>
-
-              </React.Fragment>
-
-            )
+                {c}
+              </span>
+            </React.Fragment>
           )
-        }
-
+        )}
       </div>
 
-
-      {/* Actions */}
-      <div
-        className="top-actions"
-      >
-
-        <div
-          className="top-search"
-        >
-
+      <div className="top-actions">
+        <div className="top-search">
           <I
             name="search"
             size={14}
           />
 
-
           <input
-
             placeholder="Search records..."
-
             value={
               search ||
               ""
             }
-
             onChange={(e) =>
               onSearch &&
               onSearch(
                 e.target.value
               )
             }
-
           />
-
         </div>
 
-
         {right}
-
       </div>
-
     </div>
-
   );
 }
 
 
-// =========================================================
-// PAGE HEADER
-// =========================================================
+// ───── Page header ─────────────────────────────────────────
 
 function PageHead({
   eyebrow,
@@ -1165,79 +852,45 @@ function PageHead({
   sub,
   actions
 }) {
-
   return (
-
-    <div
-      className="page-head"
-    >
-
+    <div className="page-head">
       <div>
-
         {eyebrow && (
-
-          <div
-            className="page-eyebrow"
-          >
+          <div className="page-eyebrow">
             {
               eyebrow
             }
           </div>
-
         )}
 
-
-        <h1
-          className="page-title serif"
-        >
-
+        <h1 className="page-title serif">
           {
             title
           }
-
         </h1>
 
-
         {sub && (
-
-          <div
-            className="page-sub"
-          >
-
+          <div className="page-sub">
             {
               sub
             }
-
           </div>
-
         )}
-
       </div>
 
-
       {actions && (
-
-        <div
-          className="actions"
-        >
-
+        <div className="actions">
           {
             actions
           }
-
         </div>
-
       )}
-
     </div>
-
   );
 }
 
 
-// =========================================================
-// STAT TILE
-// =========================================================
+// ───── Stat tile ───────────────────────────────────────────
 
 function Stat({
   label,
@@ -1248,128 +901,77 @@ function Stat({
   accent,
   spark
 }) {
-
   return (
-
     <div
-      className={
-        `stat ${
-          accent
-
-            ? "accent-" +
-              accent
-
-            : ""
-        }`
-      }
+      className={`stat ${
+        accent
+          ? "accent-" +
+            accent
+          : ""
+      }`}
     >
-
-      <div
-        className="label"
-      >
-
+      <div className="label">
         {
           label
         }
-
       </div>
 
-
-      <div
-        className="value serif tnum"
-      >
-
+      <div className="value serif tnum">
         {
           value
         }
 
-
         {unit && (
-
-          <span
-            className="unit"
-          >
-
+          <span className="unit">
             {
               unit
             }
-
           </span>
-
         )}
-
       </div>
 
-
       {delta && (
-
-        <div
-          className="delta"
-        >
-
+        <div className="delta">
           <span
             className={
               deltaDir
             }
           >
-
             <I
-
               name={
                 deltaDir ===
                 "up"
-
                   ? "arrowUp"
-
                   : deltaDir ===
                     "down"
-
                   ? "arrowDown"
-
                   : "arrowRight"
               }
-
               size={12}
-
             />
-
           </span>
-
 
           <span>
             {
               delta
             }
           </span>
-
         </div>
-
       )}
 
-
       {spark && (
-
-        <div
-          className="spark"
-        >
-
+        <div className="spark">
           {
             spark
           }
-
         </div>
-
       )}
-
     </div>
-
   );
 }
 
 
-// =========================================================
-// SPARKLINE
-// =========================================================
+// Simple sparkline
 
 function Spark({
   data,
@@ -1377,37 +979,31 @@ function Spark({
   w = 70,
   h = 22
 }) {
-
   const max =
     Math.max(
       ...data
     );
-
 
   const min =
     Math.min(
       ...data
     );
 
-
   const range =
     max -
-    min ||
+      min ||
     1;
-
 
   const pts =
     data
-
       .map(
         (
-          value,
-          index
+          v,
+          i
         ) => {
-
           const x =
             (
-              index /
+              i /
               (
                 data.length -
                 1
@@ -1415,73 +1011,41 @@ function Spark({
             ) *
             w;
 
-
           const y =
             h -
             (
               (
-                value -
+                v -
                 min
               ) /
               range
             ) *
             h;
 
-
-          return (
-            `${x},${y}`
-          );
+          return `${x},${y}`;
         }
       )
-
       .join(" ");
 
-
   return (
-
     <svg
-
-      width={
-        w
-      }
-
-      height={
-        h
-      }
-
-      viewBox={
-        `0 0 ${w} ${h}`
-      }
-
+      width={w}
+      height={h}
+      viewBox={`0 0 ${w} ${h}`}
       fill="none"
-
     >
-
       <polyline
-
-        points={
-          pts
-        }
-
-        stroke={
-          color
-        }
-
+        points={pts}
+        stroke={color}
         strokeWidth="1.5"
-
         strokeLinejoin="round"
-
       />
-
     </svg>
-
   );
 }
 
 
-// =========================================================
-// MODAL
-// =========================================================
+// ───── Modal ───────────────────────────────────────────────
 
 function Modal({
   title,
@@ -1491,248 +1055,164 @@ function Modal({
   onClose,
   wide
 }) {
+  React.useEffect(() => {
+    const k =
+      (
+        e
+      ) =>
+        e.key ===
+          "Escape" &&
+        onClose &&
+        onClose();
 
-  React.useEffect(
-    () => {
+    window.addEventListener(
+      "keydown",
+      k
+    );
 
-      const k =
-        (e) => {
-
-          if (
-            e.key ===
-              "Escape" &&
-            onClose
-          ) {
-            onClose();
-          }
-
-        };
-
-
-      window.addEventListener(
+    return () =>
+      window.removeEventListener(
         "keydown",
         k
       );
-
-
-      return () =>
-        window.removeEventListener(
-          "keydown",
-          k
-        );
-
-    },
-
-    [
-      onClose
-    ]
-  );
-
+  }, [
+    onClose
+  ]);
 
   return (
-
     <div
-
       className="modal-scrim"
-
       onClick={
         onClose
       }
-
     >
-
       <div
-
         className="modal"
-
         style={
           wide
-
             ? {
                 width:
                   "min(820px, 94vw)"
               }
-
             : null
         }
-
         onClick={(e) =>
           e.stopPropagation()
         }
-
       >
-
-        <div
-          className="modal-h"
-        >
-
+        <div className="modal-h">
           <div
             style={{
-              flex: 1,
+              flex:
+                1
             }}
           >
-
             <h3>
               {
                 title
               }
             </h3>
 
-
             {sub && (
-
               <div
-
                 className="muted small"
-
                 style={{
-                  marginTop: 2,
+                  marginTop:
+                    2
                 }}
-
               >
-
                 {
                   sub
                 }
-
               </div>
-
             )}
-
           </div>
 
-
           <button
-
             className="btn btn-ghost btn-sm"
-
             onClick={
               onClose
             }
-
             title="Close"
-
             aria-label="Close"
-
           >
-
             <I
               name="x"
               size={14}
             />
-
           </button>
-
         </div>
 
-
-        <div
-          className="modal-b"
-        >
-
+        <div className="modal-b">
           {
             children
           }
-
         </div>
 
-
         {footer && (
-
-          <div
-            className="modal-f"
-          >
-
+          <div className="modal-f">
             {
               footer
             }
-
           </div>
-
         )}
-
       </div>
-
     </div>
-
   );
 }
 
 
-// =========================================================
-// TOAST
-// =========================================================
+// ───── Toast ───────────────────────────────────────────────
 
 function Toast({
   kind = "ok",
   text,
   sub
 }) {
-
   return (
-
     <div
-      className={
-        `toast ${kind}`
-      }
+      className={`toast ${kind}`}
     >
-
-      <div
-        className="dot"
-      />
-
+      <div className="dot" />
 
       <div>
-
         <div>
           {
             text
           }
         </div>
 
-
         {sub && (
-
           <div
-
             className="muted small"
-
             style={{
-              marginTop: 2,
+              marginTop:
+                2
             }}
-
           >
-
             {
               sub
             }
-
           </div>
-
         )}
-
       </div>
-
     </div>
-
   );
 }
 
 
-// =========================================================
-// TOAST PROVIDER
-// =========================================================
+// ───── Toast manager ───────────────────────────────────────
 
 const ToastCtx =
   React.createContext({
-    push: () => {},
+    push:
+      () => {}
   });
 
 
 function ToastProvider({
   children
 }) {
-
   const [
     list,
     setList
@@ -1741,70 +1221,64 @@ function ToastProvider({
       []
     );
 
-
   const push =
     React.useCallback(
-      (toast) => {
-
+      (
+        t
+      ) => {
         const id =
           Math.random()
-            .toString(36)
-            .slice(2);
-
+            .toString(
+              36
+            )
+            .slice(
+              2
+            );
 
         setList(
-          (current) => [
-
-            ...current,
-
+          (
+            l
+          ) => [
+            ...l,
             {
               id,
-              ...toast,
-            },
-
+              ...t
+            }
           ]
         );
 
-
         setTimeout(
-          () => {
-
+          () =>
             setList(
-              (current) =>
-                current.filter(
-                  (item) =>
-                    item.id !==
+              (
+                l
+              ) =>
+                l.filter(
+                  (
+                    x
+                  ) =>
+                    x.id !==
                     id
                 )
-            );
-
-          },
-
-          toast.duration ||
-          3600
+            ),
+          t.duration ||
+            3600
         );
-
       },
-
       []
     );
 
-
   return (
-
     <ToastCtx.Provider
       value={{
         push
       }}
     >
-
       {
         children
       }
 
-
       <div
-
         style={{
           position:
             "fixed",
@@ -1816,83 +1290,65 @@ function ToastProvider({
             0,
 
           zIndex:
-            80,
+            80
         }}
-
       >
-
-        {
-          list.map(
-            (toast) => (
-
-              <div
-
-                key={
-                  toast.id
+        {list.map(
+          (
+            t
+          ) => (
+            <div
+              key={
+                t.id
+              }
+              style={{
+                marginBottom:
+                  8
+              }}
+            >
+              <Toast
+                kind={
+                  t.kind
                 }
-
-                style={{
-                  marginBottom:
-                    8,
-                }}
-
-              >
-
-                <Toast
-
-                  kind={
-                    toast.kind
-                  }
-
-                  text={
-                    toast.text
-                  }
-
-                  sub={
-                    toast.sub
-                  }
-
-                />
-
-              </div>
-
-            )
+                text={
+                  t.text
+                }
+                sub={
+                  t.sub
+                }
+              />
+            </div>
           )
-        }
-
+        )}
       </div>
-
     </ToastCtx.Provider>
-
   );
 }
 
 
-// =========================================================
-// HELPERS
-// =========================================================
+// Helpers
 
 function hospitalById(
   id
 ) {
-
   return HOSPITALS.find(
-    (hospital) =>
-      hospital.id ===
+    (
+      h
+    ) =>
+      h.id ===
       id
   );
-
 }
 
 
 function fmtDate(
   d
 ) {
-
-  if (!d) {
+  if (
+    !d
+  ) {
     return "—";
   }
-
 
   const dt =
     new Date(
@@ -1902,13 +1358,9 @@ function fmtDate(
       )
     );
 
-
   return dt.toLocaleString(
-
     "en-PH",
-
     {
-
       month:
         "short",
 
@@ -1922,23 +1374,15 @@ function fmtDate(
         "2-digit",
 
       hour12:
-        false,
-
+        false
     }
-
   );
-
 }
 
-
-// =========================================================
-// GLOBAL EXPORTS
-// =========================================================
 
 Object.assign(
   window,
   {
-
     Icon,
     ICONS,
     I,
@@ -1966,6 +1410,5 @@ Object.assign(
     isSecondaryHospital,
     buildPermissions,
     transferStatusKind,
-
   }
 );
