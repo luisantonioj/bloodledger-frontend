@@ -67,7 +67,7 @@ function App() {
   ] =
     React.useState({
       hospital:
-        HOSPITALS[1],
+        HOSPITALS[0],
 
       user: {
         name:
@@ -228,7 +228,7 @@ function App() {
           result.status ||
           (
             payload.requestOnly
-              ? "Pending"
+              ? "Requested"
               : "Requested"
           ),
 
@@ -300,6 +300,19 @@ function App() {
 
 
       return tx;
+    };
+
+
+  const handleTransfersChange =
+    (
+      nextTransfers
+    ) => {
+      setTransfers(
+        nextTransfers
+      );
+
+      window.TRANSFERS =
+        nextTransfers;
     };
 
 
@@ -382,6 +395,9 @@ function App() {
 
     onCommit:
       handleCommit,
+
+    onUpdateTransfers:
+      handleTransfersChange,
   };
 
 

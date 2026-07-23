@@ -973,6 +973,11 @@ input, select, textarea { font-family: inherit; font-size: inherit; color: inher
 .toast.warn .dot { background: var(--warn); }
 .toast.critical .dot { background: var(--critical); }
 
+.btn-restricted {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* Modal */
 .modal-scrim {
   position: fixed; inset: 0;

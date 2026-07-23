@@ -412,6 +412,10 @@ function buildPermissions(
     canCreateTransfer:
       !readOnly,
 
+    canCreateRequest:
+      secondary &&
+      !readOnly,
+
     canFullTransfer:
       !readOnly &&
       !secondary,
@@ -423,12 +427,8 @@ function buildPermissions(
         "MMC-LIP",
 
     canApprove:
-      [
-        "admin",
-        "system"
-      ].includes(
-        key
-      ) &&
+      key ===
+        "admin" &&
       !secondary,
 
     canAcknowledge:

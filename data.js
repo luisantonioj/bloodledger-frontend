@@ -493,6 +493,20 @@ window.INVENTORY = [
 
 window.TRANSFERS = [
   {
+    id: "REQ-2026-0501",
+    type: "O+",
+    units: 2,
+    from: null,
+    to: "LMC-LIP",
+    status: "Requested",
+    initiated: "2026-05-21 08:15",
+    completed: null,
+    urgency: "Urgent",
+    note: "Secondary hospital stock request.",
+    requestOnly: true,
+  },
+
+  {
     id: "TX-2026-0492",
     type: "O-",
     units: 2,
@@ -728,6 +742,11 @@ window.AUDIT = [
     actor: "mtech.santos",
     role: "Medical Technologist",
     action: "Blood transfer received",
+    scanId: "SCN-IN-2026-0318",
+    requestId: "REQ-2026-0477",
+    transferId: "TX-2026-0492",
+    blockchainId:
+      "a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e",
     target: "TX-2026-0492 · 2 × O−",
     status: "Completed",
   },
@@ -737,6 +756,11 @@ window.AUDIT = [
     actor: "bloodbank.head",
     role: "Blood Bank Head",
     action: "Blood transfer dispatched",
+    scanId: "SCN-OUT-2026-0294",
+    requestId: "REQ-2026-0477",
+    transferId: "TX-2026-0492",
+    blockchainId:
+      "4d129a83a6f27cb53664728789110628fb96ac10d67f45f18c7aa17b3e5222ef",
     target: "TX-2026-0492 · 2 × O−",
     status: "Completed",
   },
@@ -746,6 +770,11 @@ window.AUDIT = [
     actor: "head.reyes",
     role: "Blood Bank Head",
     action: "Transfer approved",
+    scanId: null,
+    requestId: "REQ-2026-0475",
+    transferId: "TX-2026-0490",
+    blockchainId:
+      "9b18d47fb3510e24665c7685407e463b73d6761448f1be5a5131d277f06373c1",
     target: "TX-2026-0490",
     status: "Completed",
   },
@@ -755,6 +784,11 @@ window.AUDIT = [
     actor: "mtech.santos",
     role: "Medical Technologist",
     action: "Blood request created",
+    scanId: null,
+    requestId: "REQ-2026-0475",
+    transferId: null,
+    blockchainId:
+      "61cd007e5656df568230827476bc0c212313655828f325140661b252c42c0ab2",
     target: "TX-2026-0490",
     status: "Recorded",
   },
@@ -764,6 +798,11 @@ window.AUDIT = [
     actor: "scanner",
     role: "System",
     action: "Blood unit added",
+    scanId: "SCN-IN-2026-0289",
+    requestId: null,
+    transferId: null,
+    blockchainId:
+      "33aa196f09a4082111777043975ce11fb7059c357e962f03903b09ca46a49fde",
     target: "ISBT =)W0381 2512 100117",
     status: "Recorded",
   },

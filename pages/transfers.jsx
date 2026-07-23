@@ -12,14 +12,22 @@ function TransfersPage({
   onNav,
   prefill,
   onCommit,
+  onUpdateTransfers,
 }) {
   const transferList = transfers || window.TRANSFERS || [];
+  const toast = React.useContext(ToastCtx);
+  const canCreateRequest = !!permissions.canCreateRequest;
 
   const [activeTab, setActiveTab] = React.useState("requests");
   const [showRequestForm, setShowRequestForm] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState(
     prefill?.selectId || null
   );
+  const [selectedRequestId, setSelectedRequestId] = React.useState(null);
+  const [decision, setDecision] = React.useState(null);
+  const [authMode, setAuthMode] = React.useState("Scan");
+  const [headId, setHeadId] = React.useState("");
+  const [movementAction, setMovementAction] = React.useState(null);
 
   const [bloodType, setBloodType] = React.useState(
     prefill?.type || "O+"
@@ -41,10 +49,13 @@ function TransfersPage({
       setActiveTab("transfers");
     }
 
-    if (prefill?.type || prefill?.units) {
+    if (
+      canCreateRequest &&
+      (prefill?.type || prefill?.units)
+    ) {
       setShowRequestForm(true);
     }
-  }, [prefill]);
+  }, [prefill, canCreateRequest]);
 
   const requests = transferList.filter((item) => {
     return (
@@ -63,7 +74,195 @@ function TransfersPage({
     activeTransfers[0] ||
     null;
 
+  const selectedRequest =
+    requests.find((item) => item.id === selectedRequestId) ||
+    requests[0] ||
+    null;
+
+  const nowStamp = () =>
+    new Date()
+      .toISOString()
+      .slice(0, 19)
+      .replace("T", " ");
+
+  const blockchainId = () => {
+    const bytes = new Uint8Array(32);
+
+    if (window.crypto?.getRandomValues) {
+      window.crypto.getRandomValues(bytes);
+    } else {
+      for (let index = 0; index < bytes.length; index += 1) {
+        bytes[index] = Math.floor(Math.random() * 256);
+      }
+    }
+
+    return Array.from(bytes)
+      .map((value) => value.toString(16).padStart(2, "0"))
+      .join("");
+  };
+
+  const shortHash = (value) =>
+    value ? `${value.slice(0, 6)}…` : "—";
+
+  const replaceRecord = (id, changes) =>
+    transferList.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            ...changes,
+          }
+        : item
+    );
+
+  const openDecision = (nextDecision) => {
+    setDecision(nextDecision);
+    setAuthMode("Scan");
+    setHeadId("");
+  };
+
+  const simulateHeadIdScan = () => {
+    setHeadId("BBH-MMC-2026-0042");
+  };
+
+  const confirmDecision = () => {
+    if (!selectedRequest || !permissions.canApprove) return;
+
+    if (!headId.trim()) {
+      toast.push({
+        kind: "warn",
+        text: "Blood Bank Head ID required",
+        sub: "Scan the authorized ID or enter it manually to continue.",
+      });
+      return;
+    }
+
+    const decidedAt = nowStamp();
+    const decisionTxId = blockchainId();
+
+    if (decision === "Reject") {
+      onUpdateTransfers(
+        replaceRecord(selectedRequest.id, {
+          status: "Rejected",
+          rejectedBy: headId.trim(),
+          rejectedAt: decidedAt,
+          decisionTxId,
+        })
+      );
+
+      toast.push({
+        kind: "warn",
+        text: "Blood request rejected",
+        sub: `Ledger transaction ${shortHash(decisionTxId)}`,
+      });
+    } else {
+      const approvedRequest = {
+        ...selectedRequest,
+        status: "Approved",
+        approvedBy: headId.trim(),
+        approvedAt: decidedAt,
+        decisionTxId,
+      };
+
+      const transfer = {
+        id: `TX-${Date.now()}`,
+        requestId: selectedRequest.id,
+        type: selectedRequest.type,
+        units: selectedRequest.units,
+        urgency: selectedRequest.urgency,
+        from: "MMC-LIP",
+        to: selectedRequest.to,
+        status: "Approved",
+        requestOnly: false,
+        initiated: selectedRequest.initiated,
+        approvedBy: headId.trim(),
+        approvedAt: decidedAt,
+        approvalTxId: decisionTxId,
+        completed: null,
+      };
+
+      const updated = transferList.map((item) =>
+        item.id === selectedRequest.id ? approvedRequest : item
+      );
+
+      onUpdateTransfers([transfer, ...updated]);
+      setSelectedId(transfer.id);
+
+      toast.push({
+        kind: "ok",
+        text: "Blood request approved",
+        sub: `Transfer created · ${shortHash(decisionTxId)}`,
+      });
+    }
+
+    setDecision(null);
+    setHeadId("");
+  };
+
+  const confirmMovement = () => {
+    if (!selectedTransfer || !movementAction) return;
+
+    const actionAt = nowStamp();
+    const actionTxId = blockchainId();
+
+    if (movementAction === "Outbound") {
+      onUpdateTransfers(
+        replaceRecord(selectedTransfer.id, {
+          status: "In Transit",
+          outboundAt: actionAt,
+          outboundBy: "MMMC scanner",
+          outboundTxId: actionTxId,
+        })
+      );
+
+      toast.push({
+        kind: "ok",
+        text: "Outbound scan recorded",
+        sub: `Transfer is now In Transit · ${shortHash(actionTxId)}`,
+      });
+    } else {
+      onUpdateTransfers(
+        replaceRecord(selectedTransfer.id, {
+          status: "Received",
+          receivedAt: actionAt,
+          completed: actionAt,
+          receivedBy: `${hospital?.short || "Receiver"} scanner`,
+          receiptTxId: actionTxId,
+        })
+      );
+
+      toast.push({
+        kind: "ok",
+        text: "Inbound receipt confirmed",
+        sub: `Transfer marked Received · ${shortHash(actionTxId)}`,
+      });
+    }
+
+    setMovementAction(null);
+  };
+
+  const transitDuration = (item) => {
+    if (!item?.outboundAt || !item?.receivedAt) return "—";
+
+    const start = new Date(item.outboundAt.replace(" ", "T"));
+    const end = new Date(item.receivedAt.replace(" ", "T"));
+    const minutes = Math.max(0, Math.round((end - start) / 60000));
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+
+    return `${hours}h ${remainder}m`;
+  };
+
   const createRequest = async () => {
+    if (!canCreateRequest) {
+      setShowRequestForm(false);
+      toast.push({
+        kind: "warn",
+        text: "Available to secondary requesters only",
+        sub: "Blood requests from Mary Mediatrix are planned as a future feature.",
+      });
+      return;
+    }
+
     const payload = {
       type: bloodType,
       units: Number(units),
@@ -81,6 +280,23 @@ function TransfersPage({
     setNote("");
     setUnits(1);
     setUrgency("Routine");
+  };
+
+  const openRequestForm = () => {
+    if (!canCreateRequest) {
+      setShowRequestForm(false);
+      toast.push({
+        kind: "warn",
+        text: "Future feature",
+        sub:
+          hospital?.id === "MMC-LIP"
+            ? "Mary Mediatrix is currently the BloodLedger supplier. Requesting blood from other hospitals will be enabled in a future phase."
+            : "New blood requests are currently enabled for secondary requester hospitals only.",
+      });
+      return;
+    }
+
+    setShowRequestForm(true);
   };
 
   /*
@@ -172,14 +388,22 @@ function TransfersPage({
         sub="View blood requests and track the movement of blood units between participating facilities."
         actions={
           <>
-            {permissions.canCreateTransfer && (
-              <Btn
-                icon="plus"
-                onClick={() => setShowRequestForm(true)}
-              >
-                New Blood Request
-              </Btn>
-            )}
+            <button
+              type="button"
+              className={`btn ${
+                canCreateRequest ? "" : "btn-restricted"
+              }`}
+              data-restricted={!canCreateRequest}
+              title={
+                canCreateRequest
+                  ? "Create a blood request"
+                  : "Available to secondary requester hospitals only"
+              }
+              onClick={openRequestForm}
+            >
+              <I name="plus" size={14} />
+              New Blood Request
+            </button>
           </>
         }
       />
@@ -391,7 +615,8 @@ function TransfersPage({
           ====================================================== */}
 
       {activeTab === "requests" && (
-        <div className="card">
+        <div className="grid-dash">
+          <div className="card">
           <div className="card-h">
             <div>
               <h3>Blood Requests</h3>
@@ -418,7 +643,11 @@ function TransfersPage({
               <tbody>
                 {requests.length > 0 ? (
                   requests.map((item) => (
-                    <tr key={item.id}>
+                    <tr
+                      key={item.id}
+                      className="row-clickable"
+                      onClick={() => setSelectedRequestId(item.id)}
+                    >
                       <td className="mono small">
                         {item.id}
                       </td>
@@ -455,7 +684,7 @@ function TransfersPage({
                           }
                           dot
                         >
-                          {item.status || "Pending"}
+                          {item.status || "Requested"}
                         </Chip>
                       </td>
                     </tr>
@@ -476,6 +705,138 @@ function TransfersPage({
                 )}
               </tbody>
             </table>
+          </div>
+          </div>
+
+          <div className="card">
+            <div className="card-h">
+              <div>
+                <h3>Request Review</h3>
+                <div className="sub muted">
+                  Blood Bank Head approval is required before transfer preparation.
+                </div>
+              </div>
+            </div>
+
+            <div className="card-b">
+              {!selectedRequest ? (
+                <div
+                  className="muted"
+                  style={{ textAlign: "center", padding: 30 }}
+                >
+                  Select a blood request to review.
+                </div>
+              ) : (
+                <>
+                  <div
+                    className="row"
+                    style={{
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div>
+                      <div className="mono">{selectedRequest.id}</div>
+                      <div className="muted small">
+                        Secondary hospital request
+                      </div>
+                    </div>
+
+                    <Chip
+                      kind={
+                        selectedRequest.status === "Rejected"
+                          ? "critical"
+                          : selectedRequest.status === "Approved"
+                          ? "ok"
+                          : "warn"
+                      }
+                      dot
+                    >
+                      {selectedRequest.status || "Requested"}
+                    </Chip>
+                  </div>
+
+                  <div className="divider" />
+
+                  <dl className="kv">
+                    <dt>Requesting Facility</dt>
+                    <dd>
+                      {hospitalById(selectedRequest.to)?.name ||
+                        selectedRequest.to ||
+                        "—"}
+                    </dd>
+
+                    <dt>Blood Product</dt>
+                    <dd>
+                      {selectedRequest.type} · {selectedRequest.units} unit(s)
+                    </dd>
+
+                    <dt>Priority</dt>
+                    <dd>{selectedRequest.urgency || "Routine"}</dd>
+
+                    <dt>Requested At</dt>
+                    <dd className="mono small">
+                      {selectedRequest.initiated || "—"}
+                    </dd>
+
+                    <dt>Notes</dt>
+                    <dd>{selectedRequest.note || "No additional notes."}</dd>
+
+                    {selectedRequest.approvedBy && (
+                      <>
+                        <dt>Approved By</dt>
+                        <dd className="mono small">
+                          {selectedRequest.approvedBy}
+                        </dd>
+
+                        <dt>Approval Ledger ID</dt>
+                        <dd
+                          className="mono small"
+                          title={selectedRequest.decisionTxId}
+                        >
+                          {shortHash(selectedRequest.decisionTxId)}
+                        </dd>
+                      </>
+                    )}
+
+                    {selectedRequest.rejectedBy && (
+                      <>
+                        <dt>Rejected By</dt>
+                        <dd className="mono small">
+                          {selectedRequest.rejectedBy}
+                        </dd>
+                      </>
+                    )}
+                  </dl>
+
+                  {selectedRequest.status === "Requested" &&
+                    hospital?.id === "MMC-LIP" &&
+                    permissions.canApprove && (
+                      <>
+                        <div className="divider" />
+                        <div className="row">
+                          <Btn
+                            kind="ghost"
+                            onClick={() => openDecision("Reject")}
+                          >
+                            Reject Request
+                          </Btn>
+
+                          <span style={{ flex: 1 }} />
+
+                          <Btn
+                            kind="primary"
+                            icon="check"
+                            onClick={() => openDecision("Approve")}
+                          >
+                            Approve Transfer
+                          </Btn>
+                        </div>
+                      </>
+                    )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -716,6 +1077,104 @@ function TransfersPage({
                       status={selectedTransfer.status}
                     />
                   </div>
+
+                  <div className="divider" />
+
+                  <div className="small" style={{ marginBottom: 10 }}>
+                    Transfer Lifecycle Summary
+                  </div>
+
+                  <dl className="kv">
+                    <dt>Request Reference</dt>
+                    <dd className="mono small">
+                      {selectedTransfer.requestId || "—"}
+                    </dd>
+
+                    <dt>Approved By</dt>
+                    <dd className="mono small">
+                      {selectedTransfer.approvedBy || "—"}
+                    </dd>
+
+                    <dt>Approved At</dt>
+                    <dd className="mono small">
+                      {selectedTransfer.approvedAt || "—"}
+                    </dd>
+
+                    <dt>Outbound Scan</dt>
+                    <dd className="mono small">
+                      {selectedTransfer.outboundAt || "Not recorded"}
+                    </dd>
+
+                    <dt>In Transit</dt>
+                    <dd className="mono small">
+                      {selectedTransfer.receivedAt
+                        ? transitDuration(selectedTransfer)
+                        : selectedTransfer.outboundAt
+                        ? "Active"
+                        : "Not started"}
+                    </dd>
+
+                    <dt>Received At</dt>
+                    <dd className="mono small">
+                      {selectedTransfer.receivedAt ||
+                        selectedTransfer.completed ||
+                        "Not received"}
+                    </dd>
+
+                    <dt>Approval Ledger ID</dt>
+                    <dd
+                      className="mono small"
+                      title={selectedTransfer.approvalTxId}
+                    >
+                      {shortHash(selectedTransfer.approvalTxId)}
+                    </dd>
+
+                    <dt>Outbound Ledger ID</dt>
+                    <dd
+                      className="mono small"
+                      title={selectedTransfer.outboundTxId}
+                    >
+                      {shortHash(selectedTransfer.outboundTxId)}
+                    </dd>
+
+                    <dt>Receipt Ledger ID</dt>
+                    <dd
+                      className="mono small"
+                      title={selectedTransfer.receiptTxId}
+                    >
+                      {shortHash(selectedTransfer.receiptTxId)}
+                    </dd>
+                  </dl>
+
+                  {selectedTransfer.status === "Approved" &&
+                    hospital?.id === "MMC-LIP" &&
+                    permissions.canScan && (
+                      <>
+                        <div className="divider" />
+                        <Btn
+                          kind="primary"
+                          icon="scanner"
+                          onClick={() => setMovementAction("Outbound")}
+                        >
+                          Record Outbound Scan
+                        </Btn>
+                      </>
+                    )}
+
+                  {selectedTransfer.status === "In Transit" &&
+                    permissions.secondary &&
+                    hospital?.id === selectedTransfer.to && (
+                      <>
+                        <div className="divider" />
+                        <Btn
+                          kind="primary"
+                          icon="scanner"
+                          onClick={() => setMovementAction("Inbound")}
+                        >
+                          Confirm Inbound Receipt
+                        </Btn>
+                      </>
+                    )}
                 </>
               )}
             </div>
@@ -752,6 +1211,156 @@ function TransfersPage({
           </div>
         </div>
       </div>
+
+      {decision && selectedRequest && (
+        <Modal
+          title={`${decision} Blood Request`}
+          sub="Authenticate the Blood Bank Head before recording this decision."
+          onClose={() => setDecision(null)}
+          footer={
+            <>
+              <Btn kind="ghost" onClick={() => setDecision(null)}>
+                Cancel
+              </Btn>
+
+              <Btn
+                kind={decision === "Approve" ? "primary" : "default"}
+                icon="check"
+                onClick={confirmDecision}
+              >
+                Confirm {decision}
+              </Btn>
+            </>
+          }
+        >
+          <div className="row" style={{ gap: 6, marginBottom: 18 }}>
+            {["Scan", "Manual"].map((item) => (
+              <button
+                key={item}
+                className={`filter-chip ${
+                  authMode === item ? "active" : ""
+                }`}
+                onClick={() => {
+                  setAuthMode(item);
+                  setHeadId("");
+                }}
+              >
+                {item} ID
+              </button>
+            ))}
+          </div>
+
+          {authMode === "Scan" ? (
+            <div className="card">
+              <div className="card-b" style={{ textAlign: "center" }}>
+                <I name="scanner" size={28} />
+                <div style={{ height: 10 }} />
+                <div>Scan Blood Bank Head ID</div>
+                <div className="muted small" style={{ marginTop: 4 }}>
+                  Use the authorized staff barcode or QR credential.
+                </div>
+                <div style={{ height: 16 }} />
+
+                <Btn
+                  kind="primary"
+                  icon="scanner"
+                  onClick={simulateHeadIdScan}
+                >
+                  Simulate ID Scan
+                </Btn>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="small">Blood Bank Head ID</label>
+              <input
+                className="input mono"
+                value={headId}
+                placeholder="Enter authorized ID"
+                onChange={(event) => setHeadId(event.target.value)}
+              />
+            </div>
+          )}
+
+          {headId && (
+            <>
+              <div className="divider" />
+              <dl className="kv">
+                <dt>Authenticated ID</dt>
+                <dd className="mono small">{headId}</dd>
+                <dt>Decision</dt>
+                <dd>
+                  <Chip
+                    kind={decision === "Approve" ? "ok" : "critical"}
+                    dot
+                  >
+                    {decision}
+                  </Chip>
+                </dd>
+                <dt>Request</dt>
+                <dd className="mono small">{selectedRequest.id}</dd>
+              </dl>
+            </>
+          )}
+
+          <div className="divider" />
+          <div className="muted small">
+            Confirming records the decision on the mock ledger and generates a
+            unique blockchain transaction ID.
+          </div>
+        </Modal>
+      )}
+
+      {movementAction && selectedTransfer && (
+        <Modal
+          title={
+            movementAction === "Outbound"
+              ? "Confirm Outbound Scan"
+              : "Confirm Inbound Receipt"
+          }
+          sub={
+            movementAction === "Outbound"
+              ? "This confirms that the approved blood units have left Mary Mediatrix."
+              : "This confirms that the receiving hospital has accepted the blood units."
+          }
+          onClose={() => setMovementAction(null)}
+          footer={
+            <>
+              <Btn kind="ghost" onClick={() => setMovementAction(null)}>
+                Cancel
+              </Btn>
+              <Btn kind="primary" icon="check" onClick={confirmMovement}>
+                Confirm Scan
+              </Btn>
+            </>
+          }
+        >
+          <dl className="kv">
+            <dt>Transfer ID</dt>
+            <dd className="mono small">{selectedTransfer.id}</dd>
+            <dt>Blood Product</dt>
+            <dd>
+              {selectedTransfer.type} · {selectedTransfer.units} unit(s)
+            </dd>
+            <dt>From</dt>
+            <dd>
+              {hospitalById(selectedTransfer.from)?.name ||
+                selectedTransfer.from}
+            </dd>
+            <dt>To</dt>
+            <dd>
+              {hospitalById(selectedTransfer.to)?.name ||
+                selectedTransfer.to}
+            </dd>
+            <dt>Next Status</dt>
+            <dd>
+              <Chip kind="info" dot>
+                {movementAction === "Outbound" ? "In Transit" : "Received"}
+              </Chip>
+            </dd>
+          </dl>
+        </Modal>
+      )}
     </div>
   );
 }

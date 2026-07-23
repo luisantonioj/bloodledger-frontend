@@ -14,6 +14,9 @@ function AuditPage({ hospital, permissions, onNav }) {
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState("ALL");
 
+  const shortId = (value) =>
+    value ? `${value.slice(0, 6)}…` : "—";
+
   const actionTypes = [
     "ALL",
     ...Array.from(
@@ -42,6 +45,9 @@ function AuditPage({ hospital, permissions, onNav }) {
       row.transferId ||
       row.transfer ||
       "";
+    const scanId = row.scanId || "";
+    const requestId = row.requestId || "";
+    const blockchainId = row.blockchainId || row.txHash || "";
 
     const query = search.toLowerCase();
 
@@ -60,6 +66,15 @@ function AuditPage({ hospital, permissions, onNav }) {
         .toLowerCase()
         .includes(query) ||
       String(transferId)
+        .toLowerCase()
+        .includes(query) ||
+      String(scanId)
+        .toLowerCase()
+        .includes(query) ||
+      String(requestId)
+        .toLowerCase()
+        .includes(query) ||
+      String(blockchainId)
         .toLowerCase()
         .includes(query);
 
@@ -157,8 +172,10 @@ function AuditPage({ hospital, permissions, onNav }) {
                 <th>Date & Time</th>
                 <th>Activity</th>
                 <th>User / Source</th>
-                <th>Reference</th>
-                <th>Details</th>
+                <th>Scan ID</th>
+                <th>Request ID</th>
+                <th>Transfer ID</th>
+                <th>Blockchain ID</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -183,20 +200,6 @@ function AuditPage({ hospital, permissions, onNav }) {
                       row.time ||
                       row.ts ||
                       "—";
-
-                    const reference =
-                      row.unitId ||
-                      row.isbt ||
-                      row.transferId ||
-                      row.transfer ||
-                      row.reference ||
-                      "—";
-
-                    const details =
-                      row.details ||
-                      row.description ||
-                      row.desc ||
-                      "No additional details.";
 
                     const status =
                       row.status ||
@@ -266,23 +269,23 @@ function AuditPage({ hospital, permissions, onNav }) {
                           }
                         </td>
 
-                        <td className="mono small">
-                          {
-                            reference
-                          }
+                        <td className="mono tiny">
+                          {row.scanId || "—"}
                         </td>
 
-                        <td>
-                          <div
-                            className="small"
-                            style={{
-                              maxWidth: 320,
-                            }}
-                          >
-                            {
-                              details
-                            }
-                          </div>
+                        <td className="mono tiny">
+                          {row.requestId || "—"}
+                        </td>
+
+                        <td className="mono tiny">
+                          {row.transferId || row.transfer || "—"}
+                        </td>
+
+                        <td
+                          className="mono tiny"
+                          title={row.blockchainId || row.txHash || ""}
+                        >
+                          {shortId(row.blockchainId || row.txHash)}
                         </td>
 
                         <td>
@@ -304,7 +307,7 @@ function AuditPage({ hospital, permissions, onNav }) {
               ) : (
                 <tr>
                   <td
-                    colSpan="6"
+                    colSpan="8"
                     className="muted"
                     style={{
                       textAlign:

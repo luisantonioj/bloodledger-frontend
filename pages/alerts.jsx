@@ -8,8 +8,9 @@
 // Alert behavior and hospital-specific escalation rules can be refined
 // after stakeholder validation.
 
-function AlertsPage({ permissions, onAct, onNav }) {
+function AlertsPage({ hospital, permissions, onAct, onNav }) {
   const alerts = window.ALERTS || [];
+  const toast = React.useContext(ToastCtx);
 
   const [filter, setFilter] = React.useState("all");
 
@@ -242,6 +243,21 @@ function AlertsPage({ permissions, onAct, onNav }) {
                                     : "ghost"
                                 }
                                 onClick={() => {
+                                  if (
+                                    action.goto === "transfers" &&
+                                    !permissions.canCreateRequest
+                                  ) {
+                                    toast.push({
+                                      kind: "warn",
+                                      text: "Future feature",
+                                      sub:
+                                        hospital?.id === "MMC-LIP"
+                                          ? "Mary Mediatrix is currently the BloodLedger supplier. Requesting blood from other hospitals will be enabled in a future phase."
+                                          : "Creating requests from alerts is currently enabled for secondary requester hospitals only.",
+                                    });
+                                    return;
+                                  }
+
                                   if (
                                     action.goto &&
                                     onAct
