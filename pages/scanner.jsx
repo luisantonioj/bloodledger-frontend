@@ -132,6 +132,39 @@ function ScannerPage({ hospital, permissions, onNav }) {
 
     const nextHistory = [transaction, ...history];
 
+    const currentInventory = window.INVENTORY || [];
+
+    if (direction === "Inbound") {
+      const expiryTime = new Date(`${preview.expires}T00:00:00`).getTime();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const daysLeft = Number.isNaN(expiryTime)
+        ? null
+        : Math.ceil((expiryTime - today.getTime()) / 86400000);
+      const receivedUnit = {
+        isbt: preview.isbt,
+        type: preview.type,
+        comp: preview.comp,
+        collected: preview.collected,
+        expires: preview.expires,
+        days_left: daysLeft,
+        status: "Available",
+        reserved_for: null,
+        source: preview.facilityId || "External",
+        shelf: "Pending assignment",
+        temp: null,
+      };
+
+      window.INVENTORY = [
+        receivedUnit,
+        ...currentInventory.filter((unit) => unit.isbt !== receivedUnit.isbt),
+      ];
+    } else {
+      window.INVENTORY = currentInventory.filter(
+        (unit) => unit.isbt !== preview.isbt
+      );
+    }
+
     setHistory(nextHistory);
     window.SCAN_HISTORY = nextHistory;
     setConfirming(false);

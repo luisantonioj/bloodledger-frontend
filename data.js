@@ -187,6 +187,7 @@ window.MATRIX = [
     type: "O-",
     units: 2,
     status: "critical",
+    redistributable_units: 0,
     trend: -2,
     days_cover: 1.1,
   },
@@ -195,6 +196,7 @@ window.MATRIX = [
     type: "O+",
     units: 18,
     status: "ok",
+    redistributable_units: 0,
     trend: 1,
     days_cover: 4.2,
   },
@@ -203,6 +205,7 @@ window.MATRIX = [
     type: "A-",
     units: 4,
     status: "warn",
+    redistributable_units: 0,
     trend: 0,
     days_cover: 2.0,
   },
@@ -211,6 +214,7 @@ window.MATRIX = [
     type: "A+",
     units: 22,
     status: "surplus",
+    redistributable_units: 5,
     trend: 5,
     days_cover: 8.6,
   },
@@ -219,6 +223,7 @@ window.MATRIX = [
     type: "B-",
     units: 3,
     status: "warn",
+    redistributable_units: 0,
     trend: -1,
     days_cover: 1.9,
   },
@@ -227,6 +232,7 @@ window.MATRIX = [
     type: "B+",
     units: 14,
     status: "ok",
+    redistributable_units: 0,
     trend: 2,
     days_cover: 4.8,
   },
@@ -235,6 +241,7 @@ window.MATRIX = [
     type: "AB-",
     units: 1,
     status: "critical",
+    redistributable_units: 0,
     trend: 0,
     days_cover: 0.8,
   },
@@ -243,6 +250,7 @@ window.MATRIX = [
     type: "AB+",
     units: 9,
     status: "ok",
+    redistributable_units: 0,
     trend: 1,
     days_cover: 5.3,
   },
@@ -877,3 +885,30 @@ window.REPORTING = {
   distribution: [],
   completion: [],
 };
+
+
+// =========================================================
+// PROTOTYPE USER ACCOUNTS
+// =========================================================
+// Demo-only credentials used by the frontend mock. Production accounts and
+// passwords must be managed by the authentication service, never client data.
+
+window.MOCK_ACCOUNTS = [
+  { email: "m.santos@mmc.bloodledger", password: "BloodLedger2026!", name: "M. Santos, RMT", initials: "MS", hospital: "MMC-LIP", role: "Medical Technologist" },
+  { email: "r.reyes@mmc.bloodledger", password: "BloodLedger2026!", name: "Dr. R. Reyes", initials: "RR", hospital: "MMC-LIP", role: "Blood Bank Head" },
+  { email: "a.garcia@mmc.bloodledger", password: "BloodLedger2026!", name: "A. Garcia", initials: "AG", hospital: "MMC-LIP", role: "System Administrator" },
+
+  { email: "p.cruz@prc.bloodledger", password: "BloodLedger2026!", name: "P. Cruz", initials: "PC", hospital: "PRC-LIP", role: "PRC Officer" },
+  { email: "l.mendoza@prc.bloodledger", password: "BloodLedger2026!", name: "L. Mendoza", initials: "LM", hospital: "PRC-LIP", role: "PRC Administrator" },
+
+  { email: "j.ramos@lmc.bloodledger", password: "BloodLedger2026!", name: "J. Ramos, RMT", initials: "JR", hospital: "LMC-LIP", role: "Medical Technologist" },
+  { email: "c.tan@lmc.bloodledger", password: "BloodLedger2026!", name: "C. Tan", initials: "CT", hospital: "LMC-LIP", role: "Authorized Requester" },
+
+  { email: "a.lim@mdh.bloodledger", password: "BloodLedger2026!", name: "A. Lim, RMT", initials: "AL", hospital: "MDH-LIP", role: "Medical Technologist" },
+  { email: "s.bautista@mdh.bloodledger", password: "BloodLedger2026!", name: "S. Bautista", initials: "SB", hospital: "MDH-LIP", role: "Authorized Requester" },
+
+  { email: "d.flores@clh.bloodledger", password: "BloodLedger2026!", name: "D. Flores, RMT", initials: "DF", hospital: "CLH-LIP", role: "Medical Technologist" },
+  { email: "n.aquino@clh.bloodledger", password: "BloodLedger2026!", name: "N. Aquino", initials: "NA", hospital: "CLH-LIP", role: "Authorized Requester" },
+
+  { email: "regional.officer@doh.bloodledger", password: "BloodLedger2026!", name: "DOH Calabarzon Officer", initials: "DO", hospital: "DOH-CHD", role: "DOH Regulatory Officer" },
+];

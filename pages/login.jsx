@@ -1,400 +1,182 @@
-// pages/login.jsx — Sign in to a hospital chapter
+// pages/login.jsx — Account access and institution-based registration
 
 function LoginPage({ onLogin }) {
-  const ROLE_OPTIONS = {
-    "MMC-LIP": [
-      {
-        id: "Med Technologist",
-        sub: "Initiate, dispatch & receive transfers",
-      },
-      {
-        id: "Blood Bank Head",
-        sub: "Approve, override & reconcile",
-      },
-      {
-        id: "System Administrator",
-        sub: "Manage system access & configuration",
-      },
-    ],
+  const [mode, setMode] = React.useState("signin");
+  const [email, setEmail] = React.useState("r.reyes@mmc.bloodledger");
+  const [password, setPassword] = React.useState("");
+  const [fullName, setFullName] = React.useState("");
+  const [employeeId, setEmployeeId] = React.useState("");
+  const [institution, setInstitution] = React.useState("MMC-LIP");
+  const [role, setRole] = React.useState(INSTITUTION_ROLES["MMC-LIP"]?.[0]?.id || "");
+  const [confirmPassword, setConfirmPassword] = React.useState("");
+  const [agreed, setAgreed] = React.useState(false);
+  const [registered, setRegistered] = React.useState(false);
+  const [loginError, setLoginError] = React.useState("");
+  const [signingIn, setSigningIn] = React.useState(false);
 
-    "PRC-LIP": [
-      {
-        id: "PRC Officer",
-        sub: "Hub-level distribution",
-      },
-      {
-        id: "PRC Administrator",
-        sub: "Oversee PRC-side operations",
-      },
-    ],
+  const availableRoles = INSTITUTION_ROLES[institution] || [];
 
-    "LMC-LIP": [
-      {
-        id: "Med Technologist",
-        sub: "Review availability & handle blood requests",
-      },
-      {
-        id: "Authorized Requester",
-        sub: "Create & monitor blood requests",
-      },
-    ],
-
-    "MDH-LIP": [
-      {
-        id: "Med Technologist",
-        sub: "Review availability & handle blood requests",
-      },
-      {
-        id: "Authorized Requester",
-        sub: "Create & monitor blood requests",
-      },
-    ],
-
-    "CLH-LIP": [
-      {
-        id: "Med Technologist",
-        sub: "Review availability & handle blood requests",
-      },
-      {
-        id: "Authorized Requester",
-        sub: "Create & monitor blood requests",
-      },
-    ],
-
-    "DOH-CHD": [
-      {
-        id: "Regulator (DOH)",
-        sub: "Read-only network & compliance view",
-      },
-    ],
+  const switchMode = (nextMode) => {
+    setMode(nextMode);
+    setRegistered(false);
   };
 
-  const [hospital, setHospital] =
-    React.useState("MMC-LIP");
+  const handleInstitutionChange = (event) => {
+    const nextInstitution = event.target.value;
+    const nextRoles = INSTITUTION_ROLES[nextInstitution] || [];
+    setInstitution(nextInstitution);
+    setRole(nextRoles[0]?.id || "");
+  };
 
-  const [role, setRole] =
-    React.useState("Blood Bank Head");
+  const submitSignIn = async (event) => {
+    event.preventDefault();
+    setLoginError("");
+    setSigningIn(true);
+    try {
+      await onLogin({ email, password });
+    } catch (error) {
+      setLoginError(error?.message || "Unable to sign in. Please try again.");
+      setSigningIn(false);
+    }
+  };
 
-  const [email, setEmail] =
-    React.useState("r.reyes");
+  const submitRegistration = (event) => {
+    event.preventDefault();
+    if (password !== confirmPassword || !agreed) return;
+    setRegistered(true);
+  };
 
-  const [pin, setPin] =
-    React.useState("");
-
-  const availableRoles =
-    ROLE_OPTIONS[hospital] || [];
-
-  const handleHospitalChange = (e) => {
-    const nextHospital =
-      e.target.value;
-
-    const nextRoles =
-      ROLE_OPTIONS[nextHospital] || [];
-
-    setHospital(nextHospital);
-
-    // Reset to the first valid role for the selected institution.
-    setRole(
-      nextRoles[0]?.id || ""
+  if (registered) {
+    const selectedInstitution = HOSPITALS.find((item) => item.id === institution);
+    return (
+      <AuthShell>
+        <div className="auth-success-mark"><I name="check" size={22} /></div>
+        <div className="page-eyebrow">Registration received</div>
+        <h1 className="auth-title">Your account is awaiting approval.</h1>
+        <p className="auth-copy">
+          {selectedInstitution?.short || "Your institution"} must verify your employee record and requested role before access is activated.
+        </p>
+        <div className="auth-summary">
+          <div><span>Institution / Chapter</span><strong>{selectedInstitution?.name}</strong></div>
+          <div><span>Requested role</span><strong>{role}</strong></div>
+          <div><span>Account email</span><strong>{email}</strong></div>
+        </div>
+        <Btn kind="primary" size="lg" onClick={() => switchMode("signin")}>Return to sign in</Btn>
+      </AuthShell>
     );
-  };
-
-  const submit = (e) => {
-    e.preventDefault();
-
-    onLogin({
-      hospital,
-      role,
-      username: email,
-      pin,
-    });
-  };
+  }
 
   return (
-    <div className="login-wrap">
-      <div className="login-hero">
-        <div className="topline">
-          <div
-            className="brand-mark"
-            style={{
-              width: 32,
-              height: 32,
-              fontSize: 19,
-            }}
-          >
-            B
-          </div>
+    <AuthShell>
+      <div className="auth-tabs" role="tablist" aria-label="Account access">
+        <button type="button" className={mode === "signin" ? "active" : ""} onClick={() => switchMode("signin")}>Sign in</button>
+        <button type="button" className={mode === "signup" ? "active" : ""} onClick={() => switchMode("signup")}>Create account</button>
+      </div>
 
+      {mode === "signin" ? (
+        <form className="auth-form" onSubmit={submitSignIn}>
           <div>
-            <div
-              style={{
-                fontFamily:
-                  "var(--font-display)",
-                fontSize: 22,
-                letterSpacing: "-0.01em",
-              }}
-            >
-              Blood
-              <em
-                style={{
-                  fontStyle: "italic",
-                  color: "#D7CFBC",
-                }}
-              >
-                ledger
-              </em>
+            <div className="page-eyebrow">Welcome back</div>
+            <h1 className="auth-title">Sign in to BloodLedger</h1>
+            <p className="auth-copy">Use the email address associated with your approved account.</p>
+          </div>
+          <div className="field">
+            <label htmlFor="login-email">Email address</label>
+            <input id="login-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@hospital.org" autoComplete="email" required />
+          </div>
+          <div className="field">
+            <div className="auth-label-row">
+              <label htmlFor="login-password">Password</label>
+              <button type="button" className="auth-text-button">Forgot password?</button>
             </div>
+            <input id="login-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" autoComplete="current-password" required />
+          </div>
+          <label className="auth-check"><input type="checkbox" /><span>Keep me signed in on this trusted device</span></label>
+          {loginError && <div className="auth-login-error" role="alert">{loginError}</div>}
+          <Btn kind="primary" size="lg" type="submit" disabled={signingIn}>{signingIn ? "Signing in…" : "Sign in"}</Btn>
+        </form>
+      ) : (
+        <form className="auth-form auth-form-signup" onSubmit={submitRegistration}>
+          <div>
+            <div className="page-eyebrow">Staff registration</div>
+            <h1 className="auth-title">Create your BloodLedger account</h1>
+            <p className="auth-copy">Your institution and role are verified once during registration.</p>
+          </div>
+          <div className="auth-fields-2">
+            <div className="field"><label htmlFor="signup-name">Full name</label><input id="signup-name" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Juan Dela Cruz" required /></div>
+            <div className="field"><label htmlFor="employee-id">Employee ID</label><input id="employee-id" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} placeholder="e.g. MMC-10482" required /></div>
+          </div>
+          <div className="field"><label htmlFor="signup-email">Institutional email</label><input id="signup-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@hospital.org" autoComplete="email" required /></div>
+          <div className="field">
+            <label htmlFor="signup-institution">Institution / Chapter</label>
+            <select id="signup-institution" value={institution} onChange={handleInstitutionChange} required>
+              {HOSPITALS.map((item) => <option key={item.id} value={item.id}>{item.name} — {item.type}</option>)}
+            </select>
+            <div className="hint">Select the organization that will verify and manage your access.</div>
+          </div>
+          <fieldset className="auth-role-fieldset">
+            <legend>Requested role</legend>
+            <div className="auth-role-grid">
+              {availableRoles.map((item) => (
+                <label key={item.id} className={`auth-role-option ${role === item.id ? "selected" : ""}`}>
+                  <input type="radio" name="requested-role" value={item.id} checked={role === item.id} onChange={() => setRole(item.id)} />
+                  <span><strong>{item.label}</strong><small>{item.sub}</small></span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div className="auth-fields-2">
+            <div className="field"><label htmlFor="signup-password">Password</label><input id="signup-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Create a password" autoComplete="new-password" minLength="8" required /></div>
+            <div className="field"><label htmlFor="confirm-password">Confirm password</label><input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repeat password" autoComplete="new-password" minLength="8" required />{confirmPassword && password !== confirmPassword && <div className="hint auth-error">Passwords do not match.</div>}</div>
+          </div>
+          <div className="auth-approval-note"><I name="info" size={15} /><span>Sensitive permissions are not granted automatically. An authorized administrator must approve the requested role.</span></div>
+          <label className="auth-check"><input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} required /><span>I agree to the consortium Data Sharing Agreement and account-use policies.</span></label>
+          <Btn kind="primary" size="lg" type="submit" disabled={password !== confirmPassword || !agreed}>Submit registration</Btn>
+        </form>
+      )}
+    </AuthShell>
+  );
+}
 
-            <div
-              className="brand-sub"
-              style={{
-                marginTop: 2,
-              }}
-            >
-              Lipa City Consortium
-            </div>
+function AuthShell({ children }) {
+  return (
+    <main className="auth-page">
+      <aside className="login-hero auth-hero">
+        <div className="topline">
+          <div className="brand-mark" style={{ width: 32, height: 32, fontSize: 19 }}>B</div>
+          <div>
+            <div className="auth-hero-brand">Blood<em>ledger</em></div>
+            <div className="brand-sub" style={{ marginTop: 2 }}>Lipa City Consortium</div>
           </div>
         </div>
 
         <div>
-          <div
-            className="page-eyebrow"
-            style={{
-              color: "#8C8676",
-            }}
-          >
-            An accountable supply
-          </div>
-
+          <div className="page-eyebrow auth-hero-eyebrow">An accountable supply</div>
           <h1>
-            One ledger.
-            <br />
-            Six hospitals.
-            <br />
-            <em>
-              Every unit accounted for.
-            </em>
+            One ledger.<br />
+            Six institutions.<br />
+            <em>Every unit accounted for.</em>
           </h1>
-
           <p className="lead">
-            A permissioned blockchain network for
-            the safe redistribution of blood
-            products across the Lipa City consortium
-            — built on Hyperledger Fabric, governed
-            by DOH-CHD Calabarzon and the Philippine
-            Red Cross.
+            A permissioned blockchain network supporting safe blood inventory
+            traceability and redistribution across the Lipa City consortium.
           </p>
         </div>
 
         <div className="signature">
-          <span className="sig-mark">
-            ⌘
-          </span>
-
-          <span>
-            Hyperledger Fabric · 2.5
-          </span>
-
-          <span>
-            ·
-          </span>
-
-          <span>
-            6 peers
-          </span>
-
-          <span>
-            ·
-          </span>
-
-          <span>
-            Block 124,892
-          </span>
+          <span className="sig-mark">◆</span>
+          <span>Hyperledger Fabric</span>
+          <span>·</span>
+          <span>Permissioned network</span>
         </div>
+      </aside>
+
+      <div className="auth-pane">
+        <section className="auth-card">{children}</section>
+        <footer className="auth-footer">Permissioned access for authorized consortium personnel only.</footer>
       </div>
-
-      <form
-        className="login-form"
-        onSubmit={submit}
-      >
-        <div>
-          <div className="page-eyebrow">
-            Sign in
-          </div>
-
-          <h2
-            className="serif"
-            style={{
-              fontSize: 32,
-              margin: "6px 0 4px",
-              letterSpacing: "-0.015em",
-              fontWeight: 500,
-            }}
-          >
-            Welcome back.
-          </h2>
-
-          <div className="muted">
-            Authenticate with your chapter
-            credentials.
-          </div>
-        </div>
-
-        <div className="field">
-          <label>
-            Hospital chapter
-          </label>
-
-          <select
-            value={hospital}
-            onChange={
-              handleHospitalChange
-            }
-          >
-            {HOSPITALS.map((h) => (
-              <option
-                key={h.id}
-                value={h.id}
-              >
-                {h.name} — {h.type}
-              </option>
-            ))}
-          </select>
-
-          <div className="hint">
-            Each chapter operates its own peer
-            node on the network.
-          </div>
-        </div>
-
-        <div className="field">
-          <label>
-            Role
-          </label>
-
-          <div className="option-grid">
-            {availableRoles.map((r) => (
-              <button
-                type="button"
-                key={r.id}
-                className={`option ${
-                  role === r.id
-                    ? "selected"
-                    : ""
-                }`}
-                onClick={() =>
-                  setRole(r.id)
-                }
-              >
-                <div className="nm">
-                  {r.id}
-                </div>
-
-                <div className="sub">
-                  {r.sub}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid-2">
-          <div className="field">
-            <label>
-              Username
-            </label>
-
-            <input
-              value={email}
-              onChange={(e) =>
-                setEmail(
-                  e.target.value
-                )
-              }
-              placeholder="r.reyes"
-            />
-          </div>
-
-          <div className="field">
-            <label>
-              6-digit PIN
-            </label>
-
-            <input
-              value={pin}
-              onChange={(e) =>
-                setPin(
-                  e.target.value
-                    .replace(
-                      /\D/g,
-                      ""
-                    )
-                    .slice(
-                      0,
-                      6
-                    )
-                )
-              }
-              className="mono"
-              placeholder="• • • • • •"
-            />
-          </div>
-        </div>
-
-        <div
-          className="row"
-          style={{
-            justifyContent:
-              "space-between",
-            marginTop: 6,
-          }}
-        >
-          <div
-            className="chain-status"
-            style={{
-              background:
-                "transparent",
-              border: 0,
-              padding: 0,
-            }}
-          >
-            <span className="dot" />
-
-            <span className="label">
-              Peer reachable
-            </span>
-
-            <span className="mono muted">
-              peer0.mmc.bloodledger
-            </span>
-          </div>
-
-          <Btn
-            kind="primary"
-            size="lg"
-            icon="check"
-            type="submit"
-          >
-            Sign in to network
-          </Btn>
-        </div>
-
-        <div className="divider" />
-
-        <div className="muted small">
-          By signing in you agree to the
-          consortium's Data Sharing Agreement and
-          DOH Administrative Order 2008-0008 on the
-          use of blockchain-backed traceability.
-        </div>
-      </form>
-    </div>
+    </main>
   );
 }
 
-Object.assign(
-  window,
-  {
-    LoginPage,
-  }
-);
+Object.assign(window, { LoginPage });

@@ -43,6 +43,15 @@ function DashboardPage({ hospital, permissions, transfers, onNav, onAct }) {
 
   const visibleAlerts = alerts.slice(0, 3);
   const recentTransfers = transferData.slice(0, 5);
+  const highestInventory = Math.max(
+    5,
+    ...matrix.map((item) => Number(item.units) || 0)
+  );
+  const chartMaximum = Math.ceil(highestInventory / 5) * 5;
+  const chartTicks = Array.from(
+    { length: 6 },
+    (_, index) => Math.round(chartMaximum - (chartMaximum / 5) * index)
+  );
 
   return (
     <div className="page">
@@ -117,45 +126,97 @@ function DashboardPage({ hospital, permissions, transfers, onNav, onAct }) {
           </div>
         </div>
 
-        <div className="card-b">
-          <div className="matrix">
-            {matrix.map((item) => (
-              <button
-                key={item.type}
-                className={`matrix-cell s-${item.status || "normal"}`}
-                onClick={() =>
-                  onNav("inventory", {
-                    type: item.type,
-                  })
-                }
-              >
-                <div className="indicator" />
+        <div className="card-b inventory-chart-scroll">
+          <div className="inventory-chart-legend" aria-label="Inventory status legend">
+            <span><i className="critical" />Critical</span>
+            <span><i className="warn" />Low</span>
+            <span><i className="ok" />Adequate</span>
+            <span><i className="surplus" />Available to redistribute</span>
+          </div>
 
-                <div className="head">
-                  <BloodType type={item.type} />
+          <div className="inventory-chart" aria-label="Blood inventory bar chart">
+            <div className="inventory-chart-y-title">Quantity</div>
 
-                  {item.status === "critical" && (
-                    <span className="muted tiny">
-                      Low stock
-                    </span>
-                  )}
+            <div className="inventory-chart-y-axis" aria-hidden="true">
+              {chartTicks.map((tick) => (
+                <span key={tick} className="mono tiny">
+                  {tick}
+                </span>
+              ))}
+            </div>
 
-                  {item.status === "warn" && (
-                    <span className="muted tiny">
-                      Low
-                    </span>
-                  )}
-                </div>
+            <div className="inventory-chart-plot">
+              <div className="inventory-chart-grid" aria-hidden="true">
+                {chartTicks.map((tick) => (
+                  <span key={tick} />
+                ))}
+              </div>
 
-                <div className="units serif tnum">
-                  {item.units}
-                </div>
+              <div className="inventory-chart-bars">
+                {matrix.map((item) => {
+                  const units = Number(item.units) || 0;
+                  const height = `${Math.max(
+                    3,
+                    (units / chartMaximum) * 100
+                  )}%`;
+                  const statusLabel = item.status === "critical"
+                    ? "Critical"
+                    : item.status === "warn"
+                      ? "Low"
+                      : item.status === "surplus"
+                        ? "Surplus"
+                        : "Adequate";
+                  const redistributableUnits = Math.min(
+                    units,
+                    Math.max(0, Number(item.redistributable_units) || 0)
+                  );
+                  const redistributableShare = units
+                    ? `${(redistributableUnits / units) * 100}%`
+                    : "0%";
 
-                <div className="unit-suffix">
-                  units available
-                </div>
-              </button>
-            ))}
+                  return (
+                    <button
+                      key={item.type}
+                      className={`inventory-bar s-${item.status || "normal"}`}
+                      title={`${item.type} · ${units} total units · ${redistributableUnits} available to redistribute · ${statusLabel} · ${item.days_cover} days of supply`}
+                      onClick={() =>
+                        onNav("inventory", {
+                          type: item.type,
+                        })
+                      }
+                    >
+                      <span className="inventory-bar-track">
+                        <span
+                          className="inventory-bar-value mono"
+                          style={{ bottom: `calc(${height} + 7px)` }}
+                        >
+                          {units}
+                        </span>
+
+                        <span
+                          className="inventory-bar-fill"
+                          style={{ height }}
+                        >
+                          {redistributableUnits > 0 && (
+                            <span
+                              className="inventory-bar-redistributable"
+                              style={{ height: redistributableShare }}
+                            />
+                          )}
+                        </span>
+                      </span>
+
+                      <span className="inventory-bar-label">
+                        <span>{item.type}</span>
+                        {redistributableUnits > 0 && (
+                          <small>{redistributableUnits} redistributable</small>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </div>

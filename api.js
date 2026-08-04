@@ -46,29 +46,34 @@
     };
   }
 
-  async function login({ hospital, role, username }) {
+  async function login({ email, password, hospital, role, username }) {
     if (!config.mock) {
       return request("/auth/login", {
         method: "POST",
-        body: JSON.stringify({ hospital, role, username }),
+        body: JSON.stringify({ email, password }),
       });
     }
-    const h = (window.HOSPITALS || []).find((item) => item.id === hospital);
-    const initials = role === "Blood Bank Head" ? "RR"
-      : role === "Regulator (DOH)" ? "DO"
-      : role === "PRC Officer" ? "PC"
-      : "MS";
+    const normalizedEmail = String(email || username || "").trim().toLowerCase();
+    const account = (window.MOCK_ACCOUNTS || []).find(
+      (item) => item.email.toLowerCase() === normalizedEmail
+    );
+
     await wait(180);
+
+    if (!account || (password != null && password !== account.password)) {
+      throw new Error("The email address or password is incorrect.");
+    }
+
+    const nextHospital = hospital || account.hospital;
+    const nextRole = role || account.role;
+    const h = (window.HOSPITALS || []).find((item) => item.id === nextHospital);
     return {
       hospital: h,
       user: {
-        name: role === "Blood Bank Head" ? "Dr. R. Reyes"
-          : role === "Regulator (DOH)" ? "DOH Calabarzon Desk"
-          : role === "PRC Officer" ? "PRC Lipa Officer"
-          : "M. Santos, RMT",
-        initials,
-        role: role.toUpperCase(),
-        username,
+        name: account.name,
+        initials: account.initials,
+        role: nextRole.toUpperCase(),
+        username: account.email,
       },
     };
   }

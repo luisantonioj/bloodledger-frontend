@@ -19,15 +19,25 @@ function InventoryPage({ hospital, permissions, filter, onNav }) {
 
   const inventory = window.INVENTORY || [];
 
-  // Count units by blood type.
+  // Faceted counts respond to the opposite filter group. For example, when
+  // Platelets is selected, each blood-type badge shows its platelet count.
+  const typeCountInventory = comp === "ALL"
+    ? inventory
+    : inventory.filter((unit) => unit.comp === comp);
+
+  const componentCountInventory = activeType === "ALL"
+    ? inventory
+    : inventory.filter((unit) => unit.type === activeType);
+
+  // Count units by blood type within the selected component.
   const counts = {};
-  inventory.forEach((unit) => {
+  typeCountInventory.forEach((unit) => {
     counts[unit.type] = (counts[unit.type] || 0) + 1;
   });
 
-  // Count units by component.
+  // Count units by component within the selected blood type.
   const compCounts = {};
-  inventory.forEach((unit) => {
+  componentCountInventory.forEach((unit) => {
     compCounts[unit.comp] = (compCounts[unit.comp] || 0) + 1;
   });
 
@@ -116,7 +126,7 @@ function InventoryPage({ hospital, permissions, filter, onNav }) {
           >
             All{" "}
             <span className="count">
-              {inventory.length}
+              {typeCountInventory.length}
             </span>
           </button>
 
@@ -173,13 +183,11 @@ function InventoryPage({ hospital, permissions, filter, onNav }) {
                 ? "All"
                 : component}
 
-              {component !== "ALL" && (
-                <span className="count">
-                  {compCounts[
-                    component
-                  ] || 0}
-                </span>
-              )}
+              <span className="count">
+                {component === "ALL"
+                  ? componentCountInventory.length
+                  : compCounts[component] || 0}
+              </span>
             </button>
           ))}
 
