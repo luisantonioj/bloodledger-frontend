@@ -8,8 +8,10 @@
 // Alert behavior and hospital-specific escalation rules can be refined
 // after stakeholder validation.
 
-function AlertsPage({ hospital, permissions, onAct, onNav }) {
-  const alerts = window.ALERTS || [];
+function AlertsPage({ hospital, permissions, onAct, onNav, alerts: alertRows }) {
+  const alerts = (alertRows || window.ALERTS || []).filter(
+    (alert) => !alert.hospitalId || alert.hospitalId === hospital?.id
+  );
   const toast = React.useContext(ToastCtx);
 
   const [filter, setFilter] = React.useState("all");

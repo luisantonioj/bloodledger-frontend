@@ -317,6 +317,13 @@ function roleKey(
     ).toUpperCase();
 
   if (
+    r.includes("PRC") &&
+    r.includes("ADMIN")
+  ) {
+    return "prc_admin";
+  }
+
+  if (
     r.includes(
       "DOH"
     ) ||
@@ -362,6 +369,12 @@ function roleKey(
     return "system";
   }
 
+  if (
+    r.includes("REQUESTER")
+  ) {
+    return "requester";
+  }
+
   return "readonly";
 }
 
@@ -399,7 +412,18 @@ function buildPermissions(
     key ===
       "regulator" ||
     key ===
-      "prc";
+      "prc" ||
+    key ===
+      "prc_admin";
+
+  const canManageAccounts =
+    key === "prc_admin" ||
+    key === "system";
+
+  const bloodBankOperator =
+    !secondary &&
+    session?.hospital?.id === "MMC-LIP" &&
+    ["admin", "technologist"].includes(key);
 
   return {
     roleKey:
@@ -409,22 +433,45 @@ function buildPermissions(
 
     secondary,
 
+    requester:
+      secondary,
+
+    canManageAccounts,
+
+    canViewDashboard:
+      !canManageAccounts,
+
+    canViewInventory:
+      bloodBankOperator,
+
+    canViewTransfers:
+      !canManageAccounts,
+
+    canViewAlerts:
+      !canManageAccounts,
+
+    canViewAudit:
+      true,
+
+    canViewReporting:
+      !secondary,
+
     canCreateTransfer:
-      !readOnly,
+      !readOnly &&
+      !canManageAccounts,
 
     canCreateRequest:
       secondary &&
-      !readOnly,
+      !readOnly &&
+      !canManageAccounts,
 
     canFullTransfer:
       !readOnly &&
-      !secondary,
+      !secondary &&
+      !canManageAccounts,
 
     canScan:
-      !readOnly &&
-      !secondary &&
-      session?.hospital?.id ===
-        "MMC-LIP",
+      bloodBankOperator,
 
     canApprove:
       key ===
@@ -505,6 +552,9 @@ function Sidebar({
 
           icon:
             "dashboard",
+
+          show:
+            permissions?.canViewDashboard,
         },
       ],
     },
@@ -523,6 +573,9 @@ function Sidebar({
 
           icon:
             "inventory",
+
+          show:
+            permissions?.canViewInventory,
         },
 
         {
@@ -534,6 +587,9 @@ function Sidebar({
 
           icon:
             "scanner",
+
+          show:
+            permissions?.canScan,
         },
       ],
     },
@@ -555,6 +611,9 @@ function Sidebar({
 
           badge:
             badges.transfers,
+
+          show:
+            permissions?.canViewTransfers,
         },
 
         {
@@ -572,6 +631,9 @@ function Sidebar({
 
           badgeKind:
             "blood",
+
+          show:
+            permissions?.canViewAlerts,
         },
 
         {
@@ -583,6 +645,24 @@ function Sidebar({
 
           icon:
             "audit",
+
+          show:
+            permissions?.canViewAudit,
+        },
+      ],
+    },
+
+    {
+      label:
+        "Administration",
+
+      items: [
+        {
+          id: "accounts",
+          name: "Accounts",
+          icon: "user",
+          badge: badges.accounts,
+          show: permissions?.canManageAccounts,
         },
       ],
     },
@@ -601,10 +681,18 @@ function Sidebar({
 
           icon:
             "reporting",
+
+          show:
+            permissions?.canViewReporting,
         },
       ],
     },
-  ];
+  ]
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => item.show !== false),
+    }))
+    .filter((section) => section.items.length > 0);
 
 
   return (

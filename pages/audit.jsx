@@ -8,8 +8,10 @@
 // The technical ledger implementation can remain part of the thesis
 // architecture without being exposed heavily in the base user interface.
 
-function AuditPage({ hospital, permissions, onNav }) {
-  const auditRows = window.AUDIT || window.AUDIT_LOGS || [];
+function AuditPage({ hospital, permissions, onNav, auditRows: sharedAuditRows }) {
+  const auditRows = (sharedAuditRows || window.AUDIT || window.AUDIT_LOGS || []).filter(
+    (row) => !row.hospitalIds || row.hospitalIds.includes(hospital?.id)
+  );
 
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState("ALL");

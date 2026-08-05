@@ -53,17 +53,22 @@ function ScannerPage({ hospital, permissions, onNav }) {
       otherFacilities[0] ||
       null;
 
+    const scannedUnitId =
+      direction === "Inbound"
+        ? "=)W0381 2512 100118"
+        : "=)W0381 2509 100023";
+    const registeredUnit = (window.INVENTORY || []).find(
+      (unit) => unit.isbt === scannedUnitId
+    );
+
     return {
       direction,
       method: "Scan",
-      isbt:
-        direction === "Inbound"
-          ? "=)W0381 2512 100118"
-          : "=)W0381 2509 100023",
-      type: direction === "Inbound" ? "B-" : "O+",
-      comp: "PRBC",
-      collected: direction === "Inbound" ? "2026-07-18" : "2026-07-10",
-      expires: direction === "Inbound" ? "2026-08-29" : "2026-08-21",
+      isbt: scannedUnitId,
+      type: registeredUnit?.type || (direction === "Inbound" ? "B-" : "O-"),
+      comp: registeredUnit?.comp || "PRBC",
+      collected: registeredUnit?.collected || (direction === "Inbound" ? "2026-07-18" : "2026-04-12"),
+      expires: registeredUnit?.expires || (direction === "Inbound" ? "2026-08-29" : "2026-05-23"),
       facilityId: facility?.id || "",
       facilityName: facility?.name || "External facility",
       purpose:
@@ -94,7 +99,21 @@ function ScannerPage({ hospital, permissions, onNav }) {
   };
 
   const previewScan = () => {
-    setPreview(buildScanPreview());
+    const scanned = buildScanPreview();
+    const registered = (window.INVENTORY || []).some(
+      (unit) => unit.isbt === scanned.isbt
+    );
+
+    if (!registered) {
+      toast.push({
+        kind: "warn",
+        text: "Blood unit is not registered",
+        sub: `${scanned.isbt} must be imported or manually entered before it can be scanned.`,
+      });
+      return;
+    }
+
+    setPreview(scanned);
   };
 
   const previewManual = () => {
@@ -103,6 +122,18 @@ function ScannerPage({ hospital, permissions, onNav }) {
         kind: "warn",
         text: "Complete the required fields",
         sub: "Unit ID and expiration date are required before previewing.",
+      });
+      return;
+    }
+
+    if (
+      direction === "Outbound" &&
+      !(window.INVENTORY || []).some((unit) => unit.isbt === form.isbt.trim())
+    ) {
+      toast.push({
+        kind: "warn",
+        text: "Blood unit is not registered",
+        sub: "Only blood units currently recorded in inventory can be released.",
       });
       return;
     }

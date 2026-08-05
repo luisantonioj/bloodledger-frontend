@@ -11,6 +11,16 @@ function DashboardPage({ hospital, permissions, transfers, onNav, onAct }) {
   const alerts = window.ALERTS || [];
   const transferData = transfers || window.TRANSFERS || [];
 
+  if (permissions?.requester) {
+    return (
+      <RequestorDashboard
+        hospital={hospital}
+        transfers={transferData}
+        onNav={onNav}
+      />
+    );
+  }
+
   // Basic inventory summary
   const totalUnits = matrix.reduce((sum, item) => {
     return sum + (Number(item.units) || 0);
@@ -385,6 +395,66 @@ function DashboardPage({ hospital, permissions, transfers, onNav, onAct }) {
                 No recent activity to display.
               </div>
             )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RequestorDashboard({ hospital, transfers, onNav }) {
+  const requests = transfers.filter(
+    (item) => item.to === hospital?.id || item.from === hospital?.id
+  );
+  const requested = requests.filter((item) => ["Pending", "Requested"].includes(item.status)).length;
+  const inTransit = requests.filter((item) => ["Approved", "Dispatched", "In Transit"].includes(item.status)).length;
+  const received = requests.filter((item) => ["Received", "Completed"].includes(item.status)).length;
+  const recent = requests.slice(0, 6);
+
+  return (
+    <div className="page">
+      <PageHead
+        eyebrow={hospital?.short || "Requestor"}
+        title="Requestor Dashboard"
+        sub="Create blood requests and follow their approval, dispatch, and receipt status."
+        actions={<Btn kind="primary" icon="plus" onClick={() => onNav("transfers", { type: "O+" })}>New Blood Request</Btn>}
+      />
+
+      <div className="stat-grid requestor-stat-grid">
+        <Stat label="Submitted Requests" value={requests.length} unit="total" />
+        <Stat label="Awaiting Review" value={requested} unit="requests" accent={requested ? "warn" : undefined} />
+        <Stat label="On the Way" value={inTransit} unit="transfers" accent="info" />
+        <Stat label="Received" value={received} unit="completed" accent="ok" />
+      </div>
+
+      <div style={{ height: 18 }} />
+
+      <div className="grid-dash requestor-dashboard-grid">
+        <div className="card">
+          <div className="card-h">
+            <div><h3>My Requests</h3><div className="sub muted">Requests associated with {hospital?.short}.</div></div>
+            <Btn size="sm" kind="ghost" onClick={() => onNav("transfers")}>View all <I name="arrowRight" size={12} /></Btn>
+          </div>
+          <div className="card-b flush">
+            {recent.length ? (
+              <table className="tbl">
+                <thead><tr><th>Reference</th><th>Blood</th><th className="right">Units</th><th>Priority</th><th>Status</th></tr></thead>
+                <tbody>{recent.map((item) => (
+                  <tr key={item.id} className="row-clickable" onClick={() => onNav("transfers")}>
+                    <td className="mono tiny">{item.id}</td><td><BloodType type={item.type} /></td><td className="right tnum">{item.units}</td><td>{item.urgency || "Routine"}</td><td><Chip kind={transferStatusKind(item.status)} dot>{item.status}</Chip></td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            ) : <div className="muted small" style={{ padding: 28, textAlign: "center" }}>No requests have been submitted by this institution.</div>}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-h"><div><h3>Requestor Access</h3><div className="sub muted">Available functions for this account.</div></div></div>
+          <div className="card-b requestor-access-list">
+            <div><I name="check" size={14} /><span><strong>Submit requests</strong><small>Create blood requests for review by the primary blood bank.</small></span></div>
+            <div><I name="check" size={14} /><span><strong>Track transfers</strong><small>Monitor approval, dispatch, transit, and receipt.</small></span></div>
+            <div><I name="check" size={14} /><span><strong>Review activity</strong><small>See request-related notifications and history.</small></span></div>
           </div>
         </div>
       </div>

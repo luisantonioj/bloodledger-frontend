@@ -912,3 +912,70 @@ window.MOCK_ACCOUNTS = [
 
   { email: "regional.officer@doh.bloodledger", password: "BloodLedger2026!", name: "DOH Calabarzon Officer", initials: "DO", hospital: "DOH-CHD", role: "DOH Regulatory Officer" },
 ];
+
+// Upstream supply coordination with the Philippine Red Cross.
+// These records are separate from inter-hospital blood requests.
+window.PRC_SUPPLY_REQUESTS = [
+  {
+    id: "PRC-REQ-2026-0018",
+    type: "O-",
+    component: "PRBC",
+    units: 4,
+    urgency: "Urgent",
+    neededBy: "2026-08-06T10:00",
+    requestedBy: "Dr. R. Reyes",
+    requestedAt: "2026-08-05 09:20",
+    status: "Acknowledged",
+    prcReference: "PRC-LIPA-88317",
+    note: "For critical stock replenishment.",
+  },
+  {
+    id: "PRC-REQ-2026-0017",
+    type: "B-",
+    component: "Platelets",
+    units: 2,
+    urgency: "Routine",
+    neededBy: "2026-08-07T14:00",
+    requestedBy: "Dr. R. Reyes",
+    requestedAt: "2026-08-04 15:45",
+    status: "Ready for Pickup",
+    prcReference: "PRC-LIPA-88294",
+    note: "Scheduled stock replenishment.",
+  },
+];
+
+window.PENDING_ACCOUNTS = [
+  {
+    id: "APP-2026-0184",
+    name: "K. Villanueva, RMT",
+    email: "k.villanueva@lmc.example",
+    employee_id: "LMC-2841",
+    hospital: "LMC-LIP",
+    role: "Medical Technologist",
+    applicant_type: "Requestor",
+    submitted: "2026-08-04 09:18",
+    status: "Pending Review",
+  },
+  {
+    id: "APP-2026-0183",
+    name: "E. Navarro",
+    email: "e.navarro@mdh.example",
+    employee_id: "MDH-1906",
+    hospital: "MDH-LIP",
+    role: "Authorized Requester",
+    applicant_type: "Requestor",
+    submitted: "2026-08-04 08:42",
+    status: "Pending Review",
+  },
+  {
+    id: "APP-2026-0182",
+    name: "L. Castillo, RMT",
+    email: "l.castillo@mmc.example",
+    employee_id: "MMC-3317",
+    hospital: "MMC-LIP",
+    role: "Medical Technologist",
+    applicant_type: "Blood Bank",
+    submitted: "2026-08-03 16:05",
+    status: "Pending Review",
+  },
+];

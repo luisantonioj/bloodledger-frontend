@@ -119,6 +119,46 @@ function App() {
     );
 
 
+  const [
+    accountApplications,
+    setAccountApplications
+  ] =
+    React.useState(
+      window.PENDING_ACCOUNTS ||
+      []
+    );
+
+
+  const [
+    prcSupplyRequests,
+    setPrcSupplyRequests
+  ] =
+    React.useState(
+      window.PRC_SUPPLY_REQUESTS ||
+      []
+    );
+
+
+  const [
+    alerts,
+    setAlerts
+  ] =
+    React.useState(
+      window.ALERTS ||
+      []
+    );
+
+
+  const [
+    auditRows,
+    setAuditRows
+  ] =
+    React.useState(
+      window.AUDIT ||
+      []
+    );
+
+
   const permissions =
     buildPermissions(
       session
@@ -256,6 +296,38 @@ function App() {
           payload.note ||
           "",
 
+        requesterName:
+          payload.requesterName ||
+          "",
+
+        requesterEmployeeId:
+          payload.requesterEmployeeId ||
+          "",
+
+        physicianName:
+          payload.physicianName ||
+          "",
+
+        caseReference:
+          payload.caseReference ||
+          "",
+
+        requiredDate:
+          payload.requiredDate ||
+          null,
+
+        pickupName:
+          payload.pickupName ||
+          "",
+
+        pickupIdReference:
+          payload.pickupIdReference ||
+          "",
+
+        attachments:
+          payload.attachments ||
+          [],
+
         requestOnly:
           !!payload.requestOnly,
       };
@@ -316,6 +388,34 @@ function App() {
     };
 
 
+  const handleAccountApplicationsChange =
+    (nextApplications) => {
+      setAccountApplications(nextApplications);
+      window.PENDING_ACCOUNTS = nextApplications;
+    };
+
+
+  const handlePrcSupplyRequestsChange =
+    (nextRequests) => {
+      setPrcSupplyRequests(nextRequests);
+      window.PRC_SUPPLY_REQUESTS = nextRequests;
+    };
+
+
+  const handleAlertsChange =
+    (nextAlerts) => {
+      setAlerts(nextAlerts);
+      window.ALERTS = nextAlerts;
+    };
+
+
+  const handleAuditChange =
+    (nextRows) => {
+      setAuditRows(nextRows);
+      window.AUDIT = nextRows;
+    };
+
+
   const handleLogin =
     async (
       s
@@ -338,6 +438,17 @@ function App() {
         "showLogin",
         false
       );
+
+      const nextPermissions =
+        buildPermissions(next);
+
+      setPage(
+        nextPermissions.canManageAccounts
+          ? "accounts"
+          : "dashboard"
+      );
+
+      setPageState(null);
     };
 
 
@@ -398,6 +509,26 @@ function App() {
 
     onUpdateTransfers:
       handleTransfersChange,
+
+    accountApplications,
+
+    onUpdateAccountApplications:
+      handleAccountApplicationsChange,
+
+    prcSupplyRequests,
+
+    onUpdatePrcSupplyRequests:
+      handlePrcSupplyRequestsChange,
+
+    alerts,
+
+    onUpdateAlerts:
+      handleAlertsChange,
+
+    auditRows,
+
+    onUpdateAudit:
+      handleAuditChange,
   };
 
 
@@ -435,6 +566,11 @@ function App() {
     reporting: [
       "BloodLedger",
       "Compliance Reports",
+    ],
+
+    accounts: [
+      "BloodLedger",
+      "Account Administration",
     ],
   };
 
@@ -536,6 +672,18 @@ function App() {
   }
 
 
+  else if (
+    page ===
+    "accounts"
+  ) {
+    PageBody = (
+      <AccountsPage
+        {...pageProps}
+      />
+    );
+  }
+
+
   else {
     PageBody = (
       <DashboardPage
@@ -559,14 +707,26 @@ function App() {
 
     alerts:
       (
-        window.ALERTS ||
-        []
+        alerts
       ).filter(
         (
           alert
         ) =>
+          (
+            !alert.hospitalId ||
+            alert.hospitalId === session.hospital?.id
+          ) &&
           alert.severity ===
           "critical"
+      ).length,
+
+    accounts:
+      (
+        accountApplications
+      ).filter(
+        (application) =>
+          application.status ===
+          "Pending Review"
       ).length,
   };
 
@@ -626,29 +786,17 @@ function App() {
           }
 
           right={
-            <Btn
-              icon="bell"
-              size="sm"
-              onClick={() =>
-                navigate(
-                  "alerts"
-                )
-              }
-            >
-              {
-                badges.alerts
-              }
-
-              <span
-                className="muted"
-                style={{
-                  marginLeft:
-                    4,
-                }}
-              >
-                alerts
-              </span>
-            </Btn>
+            permissions.canManageAccounts ? (
+              <Btn icon="user" size="sm" onClick={() => navigate("accounts")}>
+                {badges.accounts}
+                <span className="muted" style={{ marginLeft: 4 }}>pending accounts</span>
+              </Btn>
+            ) : permissions.canViewAlerts ? (
+              <Btn icon="bell" size="sm" onClick={() => navigate("alerts")}>
+                {badges.alerts}
+                <span className="muted" style={{ marginLeft: 4 }}>alerts</span>
+              </Btn>
+            ) : null
           }
         />
 
