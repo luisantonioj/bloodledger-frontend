@@ -2,6 +2,7 @@
 // BloodLedger inbound / outbound blood unit transaction workflow.
 
 function ScannerPage({ hospital, permissions, onNav }) {
+  const inboundOnly = Boolean(permissions?.secondary);
   const emptyForm = {
     isbt: "",
     type: window.BLOOD_TYPES[0] || "O+",
@@ -19,6 +20,18 @@ function ScannerPage({ hospital, permissions, onNav }) {
   const [confirming, setConfirming] = React.useState(false);
   const [history, setHistory] = React.useState(window.SCAN_HISTORY || []);
   const toast = React.useContext(ToastCtx);
+  const availableDirections = inboundOnly ? ["Inbound"] : ["Inbound", "Outbound"];
+  const visibleHistory = inboundOnly
+    ? history.filter((item) => (item.direction || "Inbound") === "Inbound")
+    : history;
+
+  React.useEffect(() => {
+    if (inboundOnly && direction !== "Inbound") {
+      setDirection("Inbound");
+      setPreview(null);
+      setConfirming(false);
+    }
+  }, [inboundOnly, direction]);
 
   const otherFacilities = (window.HOSPITALS || []).filter(
     (item) => item.id !== hospital?.id && item.id !== "DOH-CHD"
@@ -38,6 +51,7 @@ function ScannerPage({ hospital, permissions, onNav }) {
   };
 
   const changeDirection = (nextDirection) => {
+    if (inboundOnly && nextDirection !== "Inbound") return;
     setDirection(nextDirection);
     resetEntry();
   };
@@ -150,6 +164,15 @@ function ScannerPage({ hospital, permissions, onNav }) {
   const confirmTransaction = () => {
     if (!preview) return;
 
+    if (inboundOnly && direction !== "Inbound") {
+      toast.push({
+        kind: "warn",
+        text: "Outbound scanning is unavailable",
+        sub: "Requestor facilities can only confirm inbound blood receipts.",
+      });
+      return;
+    }
+
     const transaction = {
       ...preview,
       txId: createBlockchainId(),
@@ -212,8 +235,12 @@ function ScannerPage({ hospital, permissions, onNav }) {
     <div className="page">
       <PageHead
         eyebrow="BloodLedger"
-        title="Scan / Add Blood Unit"
-        sub="Preview and confirm inbound or outbound blood unit transactions."
+        title={inboundOnly ? "Blood Unit Receipt" : "Blood Unit Transactions"}
+        sub={
+          inboundOnly
+            ? "Scan and confirm blood units received by this requestor facility."
+            : "Preview and confirm inbound or outbound blood unit transactions."
+        }
         actions={
           <Btn size="sm" kind="ghost" onClick={() => onNav("inventory")}>
             View Inventory
@@ -226,12 +253,14 @@ function ScannerPage({ hospital, permissions, onNav }) {
           <div>
             <h3>Transaction Type</h3>
             <div className="sub muted">
-              Select whether the blood unit is entering or leaving this facility.
+              {inboundOnly
+                ? "Requestor facilities record inbound receipts only."
+                : "Select whether the blood unit is entering or leaving this facility."}
             </div>
           </div>
 
           <div className="row" style={{ gap: 6 }}>
-            {["Inbound", "Outbound"].map((item) => (
+            {availableDirections.map((item) => (
               <button
                 key={item}
                 className={`filter-chip ${
@@ -554,7 +583,9 @@ function ScannerPage({ hospital, permissions, onNav }) {
           <div>
             <h3>Recent Blood Unit Transactions</h3>
             <div className="sub muted">
-              Confirmed inbound and outbound entries with mock blockchain IDs.
+              {inboundOnly
+                ? "Confirmed inbound receipts with mock blockchain IDs."
+                : "Confirmed inbound and outbound entries with mock blockchain IDs."}
             </div>
           </div>
         </div>
@@ -574,8 +605,8 @@ function ScannerPage({ hospital, permissions, onNav }) {
             </thead>
 
             <tbody>
-              {history.length > 0 ? (
-                history.map((item, index) => (
+              {visibleHistory.length > 0 ? (
+                visibleHistory.map((item, index) => (
                   <tr key={`${item.txId || item.isbt}-${index}`}>
                     <td className="mono small">{item.ts || "—"}</td>
                     <td>
@@ -608,7 +639,9 @@ function ScannerPage({ hospital, permissions, onNav }) {
                     className="muted"
                     style={{ textAlign: "center", padding: 30 }}
                   >
-                    No inbound or outbound transactions have been recorded yet.
+                    {inboundOnly
+                      ? "No inbound receipts have been recorded yet."
+                      : "No inbound or outbound transactions have been recorded yet."}
                   </td>
                 </tr>
               )}

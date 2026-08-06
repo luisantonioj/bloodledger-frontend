@@ -37,20 +37,35 @@ function TransfersPage({
     ? {
         label: "Supplier workflow",
         description: "Review requests, authorize allocation, release units, and record outbound custody.",
-        stages: ["Review", "Approve", "Prepare", "Outbound"],
+        stages: [
+          { label: "Review Request", hint: "Check request details" },
+          { label: "Approve Request", hint: "Authorize allocation" },
+          { label: "Prepare Transfer", hint: "Assign blood units" },
+          { label: "Outbound Scan", hint: "Release custody" },
+        ],
         owner: "Mary Mediatrix Blood Bank",
       }
     : hospital?.id === "PRC-LIP"
     ? {
         label: "PRC coordination workflow",
         description: "Acknowledge upstream requests, confirm availability, prepare supply, and issue a PRC reference.",
-        stages: ["Acknowledge", "Confirm Stock", "Prepare", "Release"],
+        stages: [
+          { label: "Acknowledge", hint: "Review incoming request" },
+          { label: "Confirm Stock", hint: "Verify availability" },
+          { label: "Prepare Supply", hint: "Ready the blood units" },
+          { label: "Release", hint: "Record PRC release" },
+        ],
         owner: "PRC Lipa City Chapter",
       }
     : {
         label: "Requestor workflow",
         description: "Submit requirements, monitor approval and transit, then confirm inbound receipt.",
-        stages: ["Submit", "Await Approval", "Track", "Receive"],
+        stages: [
+          { label: "Submit Request", hint: "Provide requirements" },
+          { label: "Await Approval", hint: "Monitor the decision" },
+          { label: "Track Request", hint: "Follow transfer status" },
+          { label: "Receive Blood", hint: "Confirm inbound receipt" },
+        ],
         owner: hospital?.short || "Requesting Facility",
       };
 
@@ -97,6 +112,7 @@ function TransfersPage({
   const [prcNeededBy, setPrcNeededBy] = React.useState("");
   const [prcNote, setPrcNote] = React.useState("");
   const [requestResolution, setRequestResolution] = React.useState(null);
+  const [approvedCancellation, setApprovedCancellation] = React.useState(null);
   const [resolutionReason, setResolutionReason] = React.useState("");
   const [availableUnits, setAvailableUnits] = React.useState(1);
 
@@ -141,6 +157,14 @@ function TransfersPage({
     requests[0] ||
     null;
 
+  const linkedTransfer = selectedRequest
+    ? activeTransfers.find((item) => item.requestId === selectedRequest.id) || null
+    : null;
+
+  const linkedRequest = selectedTransfer?.requestId
+    ? requests.find((item) => item.id === selectedTransfer.requestId) || null
+    : null;
+
   const nowStamp = () =>
     new Date()
       .toISOString()
@@ -167,7 +191,7 @@ function TransfersPage({
     value ? `${value.slice(0, 6)}…` : "—";
 
   const requestStatusKind = (status) =>
-    ["Rejected", "Cancelled"].includes(status)
+    ["Rejected", "Cancelled", "Cancelled After Approval"].includes(status)
       ? "critical"
       : status === "Approved"
       ? "ok"
@@ -610,6 +634,64 @@ function TransfersPage({
     });
   };
 
+  const openApprovedCancellation = (request, transfer) => {
+    setApprovedCancellation({ request, transfer });
+    setResolutionReason("Approved request cancelled before blood-unit release.");
+  };
+
+  const cancelApprovedTransaction = () => {
+    if (!approvedCancellation || !resolutionReason.trim() || !permissions.canApprove) return;
+    const request = approvedCancellation.request;
+    const transfer = approvedCancellation.transfer;
+    const cancelledAt = nowStamp();
+    const cancellationTxId = recordRequestEvent(
+      "Approved transfer cancelled",
+      request,
+      "Recorded",
+      resolutionReason.trim(),
+      ["MMC-LIP", request.to || transfer?.to]
+    );
+
+    const updated = transferList.map((item) => {
+      if (item.id === request.id) {
+        return {
+          ...item,
+          status: "Cancelled After Approval",
+          cancellationReason: resolutionReason.trim(),
+          cancelledAt,
+          cancellationTxId,
+        };
+      }
+      if (transfer && item.id === transfer.id) {
+        return {
+          ...item,
+          status: "Cancelled",
+          completed: cancelledAt,
+          cancellationReason: resolutionReason.trim(),
+          cancelledAt,
+          cancellationTxId,
+        };
+      }
+      return item;
+    });
+
+    onUpdateTransfers(updated);
+    notifyFacility(
+      request.to || transfer?.to,
+      `Approved request cancelled - ${request.id}`,
+      `${resolutionReason.trim()} The approved transfer will not proceed to outbound release.`,
+      request.id,
+      "critical"
+    );
+    toast.push({
+      kind: "warn",
+      text: "Approved transaction cancelled",
+      sub: `${request.id}${transfer ? ` · ${transfer.id}` : ""} closed before outbound scan.`,
+    });
+    setApprovedCancellation(null);
+    setResolutionReason("");
+  };
+
   const openRequestForm = () => {
     if (!canCreateRequest) {
       setShowRequestForm(false);
@@ -787,10 +869,13 @@ function TransfersPage({
         </div>
         <div className="workflow-profile-stages">
           {workflowProfile.stages.map((stage, index) => (
-            <React.Fragment key={stage}>
+            <React.Fragment key={stage.label}>
               <div className="workflow-stage">
                 <span>{index + 1}</span>
-                <b>{stage}</b>
+                <div>
+                  <b>{stage.label}</b>
+                  <small>{stage.hint}</small>
+                </div>
               </div>
               {index < workflowProfile.stages.length - 1 && (
                 <I name="chevron-right" size={14} />
@@ -1356,6 +1441,27 @@ function TransfersPage({
                       </>
                     )}
 
+                  {selectedRequest.status === "Approved" &&
+                    linkedTransfer?.status === "Approved" &&
+                    hospital?.id === "MMC-LIP" &&
+                    permissions.canApprove && (
+                      <>
+                        <div className="divider" />
+                        <div className="approved-cancel-actions">
+                          <div>
+                            <strong>Approved, not yet released</strong>
+                            <span>The request may still be cancelled before the outbound scan.</span>
+                          </div>
+                          <Btn
+                            kind="ghost"
+                            onClick={() => openApprovedCancellation(selectedRequest, linkedTransfer)}
+                          >
+                            Cancel Approved Request
+                          </Btn>
+                        </div>
+                      </>
+                    )}
+
                   {selectedRequest.status === "Partial Offer" &&
                     permissions.secondary &&
                     hospital?.id === selectedRequest.to && (
@@ -1768,7 +1874,9 @@ function TransfersPage({
                     <dt>Received At</dt>
                     <dd className="mono small">
                       {selectedTransfer.receivedAt ||
-                        selectedTransfer.completed ||
+                        (selectedTransfer.status === "Received"
+                          ? selectedTransfer.completed
+                          : null) ||
                         "Not received"}
                     </dd>
 
@@ -1795,6 +1903,21 @@ function TransfersPage({
                     >
                       {shortHash(selectedTransfer.receiptTxId)}
                     </dd>
+
+                    {selectedTransfer.cancellationReason && (
+                      <>
+                        <dt>Cancellation Reason</dt>
+                        <dd>{selectedTransfer.cancellationReason}</dd>
+
+                        <dt>Cancelled At</dt>
+                        <dd className="mono small">{selectedTransfer.cancelledAt || "—"}</dd>
+
+                        <dt>Cancellation Ledger ID</dt>
+                        <dd className="mono small" title={selectedTransfer.cancellationTxId}>
+                          {shortHash(selectedTransfer.cancellationTxId)}
+                        </dd>
+                      </>
+                    )}
                   </dl>
 
                   {selectedTransfer.status === "Approved" &&
@@ -1802,13 +1925,23 @@ function TransfersPage({
                     permissions.canScan && (
                       <>
                         <div className="divider" />
-                        <Btn
-                          kind="primary"
-                          icon="scanner"
-                          onClick={() => setMovementAction("Outbound")}
-                        >
-                          Record Outbound Scan
-                        </Btn>
+                        <div className="row approved-transfer-actions">
+                          {linkedRequest && (
+                            <Btn
+                              kind="ghost"
+                              onClick={() => openApprovedCancellation(linkedRequest, selectedTransfer)}
+                            >
+                              Cancel Approved Transfer
+                            </Btn>
+                          )}
+                          <Btn
+                            kind="primary"
+                            icon="scanner"
+                            onClick={() => setMovementAction("Outbound")}
+                          >
+                            Record Outbound Scan
+                          </Btn>
+                        </div>
                       </>
                     )}
 
@@ -1917,6 +2050,48 @@ function TransfersPage({
               value={resolutionReason}
               onChange={(event) => setResolutionReason(event.target.value)}
               placeholder="Provide the reason shown in the requestor's alert..."
+            />
+          </label>
+        </Modal>
+      )}
+
+      {approvedCancellation && (
+        <Modal
+          title="Cancel Approved Transfer"
+          sub="This closes the approved request and its linked transfer before blood-unit release."
+          onClose={() => setApprovedCancellation(null)}
+          footer={
+            <>
+              <Btn kind="ghost" onClick={() => setApprovedCancellation(null)}>Keep Approved</Btn>
+              <Btn kind="default" icon="bell" onClick={cancelApprovedTransaction}>
+                Notify & Cancel
+              </Btn>
+            </>
+          }
+        >
+          <div className="request-resolution-summary">
+            <div><span>Request</span><strong className="mono">{approvedCancellation.request.id}</strong></div>
+            <div><span>Transfer</span><strong className="mono">{approvedCancellation.transfer?.id || "—"}</strong></div>
+            <div><span>Blood Product</span><strong>{approvedCancellation.request.type} · {approvedCancellation.request.units} unit(s)</strong></div>
+            <div><span>Requestor</span><strong>{hospitalById(approvedCancellation.request.to)?.short || approvedCancellation.request.to}</strong></div>
+          </div>
+
+          <div className="approved-cancellation-warning">
+            Cancellation is allowed only while the transfer is approved and no outbound scan has been recorded. The requestor will be notified and a ledger record will be created.
+          </div>
+
+          <label className="request-field request-resolution-reason">
+            <span>Cancellation reason</span>
+            <select value={resolutionReason} onChange={(event) => setResolutionReason(event.target.value)}>
+              <option>Approved request cancelled before blood-unit release.</option>
+              <option>Requestor no longer requires the approved blood product.</option>
+              <option>Allocated units no longer meet release criteria.</option>
+              <option>Request details changed after approval.</option>
+            </select>
+            <textarea
+              value={resolutionReason}
+              onChange={(event) => setResolutionReason(event.target.value)}
+              placeholder="State the reason recorded in the audit trail and sent to the requestor..."
             />
           </label>
         </Modal>
@@ -2082,6 +2257,15 @@ function TransfersPage({
 
 function SimpleTransferProgress({ status }) {
   const normalized = String(status || "").toLowerCase();
+
+  if (normalized.includes("cancel")) {
+    return (
+      <div className="transfer-cancelled-progress">
+        <I name="x" size={16} />
+        <span>Cancelled before outbound release</span>
+      </div>
+    );
+  }
 
   let currentStep = 1;
 

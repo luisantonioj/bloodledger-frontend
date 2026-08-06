@@ -109,7 +109,7 @@ function InventoryPage({ hospital, permissions, filter, onNav }) {
                   Import CSV
                 </Btn>
                 <Btn icon="scanner" onClick={() => onNav("scanner")}>
-                  Scan / Add Blood Unit
+                  Blood Unit Transactions
                 </Btn>
               </>
             )}

@@ -471,7 +471,8 @@ function buildPermissions(
       !canManageAccounts,
 
     canScan:
-      bloodBankOperator,
+      bloodBankOperator ||
+      (secondary && !readOnly && !canManageAccounts),
 
     canApprove:
       key ===
@@ -509,7 +510,9 @@ function transferStatusKind(
 
   if (
     s === "rejected" ||
-    s === "compromised"
+    s === "compromised" ||
+    s === "cancelled" ||
+    s === "cancelled after approval"
   ) {
     return "critical";
   }
@@ -583,7 +586,9 @@ function Sidebar({
             "scanner",
 
           name:
-            "Scan / Add Blood Unit",
+            permissions?.secondary
+              ? "Blood Unit Receipt"
+              : "Blood Unit Transactions",
 
           icon:
             "scanner",

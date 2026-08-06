@@ -395,6 +395,15 @@ function App() {
     };
 
 
+  const handleInstitutionApplication =
+    (application) => {
+      handleAccountApplicationsChange([
+        application,
+        ...accountApplications,
+      ]);
+    };
+
+
   const handlePrcSupplyRequestsChange =
     (nextRequests) => {
       setPrcSupplyRequests(nextRequests);
@@ -473,6 +482,9 @@ function App() {
           onLogin={
             handleLogin
           }
+          onSubmitApplication={
+            handleInstitutionApplication
+          }
         />
 
         {SHOW_TWEAKS && (
@@ -545,7 +557,9 @@ function App() {
 
     scanner: [
       "BloodLedger",
-      "Scan / Add Blood Unit",
+      permissions?.secondary
+        ? "Blood Unit Receipt"
+        : "Blood Unit Transactions",
     ],
 
     transfers: [

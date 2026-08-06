@@ -944,6 +944,25 @@ window.PRC_SUPPLY_REQUESTS = [
   },
 ];
 
+window.ADMIN_ACTIVITY = [
+  {
+    id: "ADM-2026-0088",
+    timestamp: "2026-08-04 10:12:00",
+    administrator: "L. Mendoza",
+    action: "Approved application",
+    target: "APP-2026-0179",
+    details: "Requestor institution documents and primary contact verified.",
+  },
+  {
+    id: "ADM-2026-0087",
+    timestamp: "2026-08-03 14:35:00",
+    administrator: "L. Mendoza",
+    action: "Deleted account",
+    target: "former.user@example.org",
+    details: "Employment ended; access removed upon institution request.",
+  },
+];
+
 window.PENDING_ACCOUNTS = [
   {
     id: "APP-2026-0184",
