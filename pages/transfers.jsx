@@ -22,7 +22,7 @@ function TransfersPage({
   onUpdateAudit,
 }) {
   const transferList = transfers || window.TRANSFERS || [];
-  const scopedTransferList = permissions.secondary
+  const scopedTransferList = permissions.secondary || permissions.bloodBank
     ? transferList.filter(
         (item) =>
           item.to === hospital?.id ||
@@ -31,9 +31,10 @@ function TransfersPage({
     : transferList;
   const toast = React.useContext(ToastCtx);
   const canCreateRequest = !!permissions.canCreateRequest;
-  const canViewPrcSupply = ["MMC-LIP", "PRC-LIP"].includes(hospital?.id);
-  const canCreatePrcRequest = hospital?.id === "MMC-LIP" && permissions.canApprove;
-  const workflowProfile = hospital?.id === "MMC-LIP"
+  const consortiumBanks = (window.CONSORTIUM_BANKS || []).map((item) => hospitalById(item.facilityId));
+  const canViewPrcSupply = permissions.bloodBank || hospital?.id === "PRC-LIP";
+  const canCreatePrcRequest = permissions.bloodBank && permissions.canApprove;
+  const workflowProfile = permissions.bloodBank
     ? {
         label: "Supplier workflow",
         description: "Review requests, authorize allocation, release units, and record outbound custody.",
@@ -43,7 +44,7 @@ function TransfersPage({
           { label: "Prepare Transfer", hint: "Assign blood units" },
           { label: "Outbound Scan", hint: "Release custody" },
         ],
-        owner: "Mary Mediatrix Blood Bank",
+        owner: `${hospital?.short || "Participating Hospital"} Blood Bank`,
       }
     : hospital?.id === "PRC-LIP"
     ? {
@@ -82,6 +83,16 @@ function TransfersPage({
 
   const [bloodType, setBloodType] = React.useState(
     prefill?.type || "O+"
+  );
+
+  const [component, setComponent] = React.useState(
+    prefill?.component || "PRBC"
+  );
+
+  const [supplierId, setSupplierId] = React.useState(
+    prefill?.supplierId ||
+      (window.CONSORTIUM_BANKS || []).find((item) => item.facilityId !== hospital?.id)?.facilityId ||
+      "MMC-LIP"
   );
 
   const [units, setUnits] = React.useState(
@@ -128,6 +139,8 @@ function TransfersPage({
     ) {
       setShowRequestForm(true);
     }
+
+    if (prefill?.supplierId) setSupplierId(prefill.supplierId);
 
     if (prefill?.selectRequestId) {
       setSelectedRequestId(prefill.selectRequestId);
@@ -216,7 +229,7 @@ function TransfersPage({
   };
 
   const simulateHeadIdScan = () => {
-    setHeadId("BBH-MMC-2026-0042");
+    setHeadId(`BBH-${hospital?.id || "BANK"}-2026-0042`);
   };
 
   const confirmDecision = () => {
@@ -262,9 +275,10 @@ function TransfersPage({
         id: `TX-${Date.now()}`,
         requestId: selectedRequest.id,
         type: selectedRequest.type,
+        component: selectedRequest.component || "PRBC",
         units: selectedRequest.units,
         urgency: selectedRequest.urgency,
-        from: "MMC-LIP",
+        from: hospital?.id,
         to: selectedRequest.to,
         status: "Approved",
         requestOnly: false,
@@ -312,7 +326,7 @@ function TransfersPage({
         replaceRecord(selectedTransfer.id, {
           status: "In Transit",
           outboundAt: actionAt,
-          outboundBy: "MMMC scanner",
+          outboundBy: `${hospital?.short || "Blood bank"} scanner`,
           outboundTxId: actionTxId,
         })
       );
@@ -360,8 +374,8 @@ function TransfersPage({
       setShowRequestForm(false);
       toast.push({
         kind: "warn",
-        text: "Available to secondary requesters only",
-        sub: "Blood requests from Mary Mediatrix are planned as a future feature.",
+        text: "Blood requests are unavailable",
+        sub: "This account does not have permission to submit consortium blood requests.",
       });
       return;
     }
@@ -396,8 +410,10 @@ function TransfersPage({
 
     const payload = {
       type: bloodType,
+      component,
       units: Number(units),
       urgency,
+      from: supplierId,
       to: hospital?.id,
       requestOnly: true,
       note,
@@ -549,7 +565,7 @@ function TransfersPage({
         selectedRequest,
         "Recorded",
         `${offered} of ${selectedRequest.units} unit(s) offered to the requestor.`,
-        ["MMC-LIP", selectedRequest.to]
+        [selectedRequest.from, selectedRequest.to]
       );
       onUpdateTransfers(replaceRecord(selectedRequest.id, {
         status: "Partial Offer",
@@ -562,7 +578,7 @@ function TransfersPage({
       notifyFacility(
         selectedRequest.to,
         `Partial availability - ${selectedRequest.id}`,
-        `Mary Mediatrix can provide ${offered} of ${selectedRequest.units} requested ${selectedRequest.type} unit(s). Please accept or decline the offer.`,
+        `${hospitalById(selectedRequest.from)?.short || "The supplying blood bank"} can provide ${offered} of ${selectedRequest.units} requested ${selectedRequest.type} unit(s). Please accept or decline the offer.`,
         selectedRequest.id,
         "warn"
       );
@@ -574,7 +590,7 @@ function TransfersPage({
         selectedRequest,
         "Recorded",
         resolutionReason.trim(),
-        ["MMC-LIP", selectedRequest.to]
+        [selectedRequest.from, selectedRequest.to]
       );
       onUpdateTransfers(replaceRecord(selectedRequest.id, {
         status: "Cancelled",
@@ -609,7 +625,7 @@ function TransfersPage({
       selectedRequest,
       "Recorded",
       details,
-      ["MMC-LIP", selectedRequest.to]
+      [selectedRequest.from, selectedRequest.to]
     );
 
     onUpdateTransfers(replaceRecord(selectedRequest.id, {
@@ -621,7 +637,7 @@ function TransfersPage({
       cancellationReason: accept ? selectedRequest.cancellationReason : "Partial availability offer declined by requestor.",
     }));
     notifyFacility(
-      "MMC-LIP",
+      selectedRequest.from,
       `${accept ? "Partial offer accepted" : "Partial offer declined"} - ${selectedRequest.id}`,
       `${hospital?.short || "The requestor"} ${accept ? `accepted ${selectedRequest.offeredUnits} unit(s)` : "declined the available quantity"}.`,
       selectedRequest.id,
@@ -630,7 +646,7 @@ function TransfersPage({
     toast.push({
       kind: accept ? "ok" : "warn",
       text: accept ? "Partial offer accepted" : "Partial offer declined",
-      sub: accept ? "The request has returned to Mary Mediatrix for approval." : "The request has been closed.",
+      sub: accept ? "The request has returned to the supplying blood bank for approval." : "The request has been closed.",
     });
   };
 
@@ -649,7 +665,7 @@ function TransfersPage({
       request,
       "Recorded",
       resolutionReason.trim(),
-      ["MMC-LIP", request.to || transfer?.to]
+      [request.from || transfer?.from, request.to || transfer?.to]
     );
 
     const updated = transferList.map((item) => {
@@ -697,11 +713,8 @@ function TransfersPage({
       setShowRequestForm(false);
       toast.push({
         kind: "warn",
-        text: "Future feature",
-        sub:
-          hospital?.id === "MMC-LIP"
-            ? "Mary Mediatrix is currently the BloodLedger supplier. Requesting blood from other hospitals will be enabled in a future phase."
-            : "New blood requests are currently enabled for secondary requester hospitals only.",
+        text: "Request creation unavailable",
+        sub: "This role does not have permission to submit blood requests.",
       });
       return;
     }
@@ -807,7 +820,7 @@ function TransfersPage({
               title={
                 canCreateRequest
                   ? "Create a blood request"
-                  : "Available to secondary requester hospitals only"
+                  : "This role cannot create blood requests"
               }
               onClick={openRequestForm}
             >
@@ -946,6 +959,26 @@ function TransfersPage({
                   <span style={helperStyle}>
                     Select the required blood type.
                   </span>
+                </div>
+
+                <div style={fieldGroupStyle}>
+                  <label style={labelStyle}>Blood Component</label>
+                  <select value={component} onChange={(event) => setComponent(event.target.value)} style={inputStyle}>
+                    {(window.COMPONENTS || []).map((item) => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                  </select>
+                  <span style={helperStyle}>Select the required blood product.</span>
+                </div>
+
+                <div style={fieldGroupStyle}>
+                  <label style={labelStyle}>Supplying Blood Bank</label>
+                  <select value={supplierId} onChange={(event) => setSupplierId(event.target.value)} style={inputStyle}>
+                    {consortiumBanks
+                      .filter((bank) => bank?.id !== hospital?.id)
+                      .map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
+                  </select>
+                  <span style={helperStyle}>The selected Blood Bank Head will review this request.</span>
                 </div>
 
                 {/* Units */}
@@ -1300,8 +1333,11 @@ function TransfersPage({
 
                     <dt>Blood Product</dt>
                     <dd>
-                      {selectedRequest.type} · {selectedRequest.units} unit(s)
+                      {selectedRequest.type} · {selectedRequest.component || "PRBC"} · {selectedRequest.units} unit(s)
                     </dd>
+
+                    <dt>Supplying Blood Bank</dt>
+                    <dd>{hospitalById(selectedRequest.from)?.name || selectedRequest.from || "Not assigned"}</dd>
 
                     <dt>Priority</dt>
                     <dd>{selectedRequest.urgency || "Routine"}</dd>
@@ -1407,7 +1443,7 @@ function TransfersPage({
                   )}
 
                   {selectedRequest.status === "Requested" &&
-                    hospital?.id === "MMC-LIP" &&
+                    hospital?.id === selectedRequest.from &&
                     permissions.canApprove && (
                       <>
                         <div className="divider" />
@@ -1443,7 +1479,7 @@ function TransfersPage({
 
                   {selectedRequest.status === "Approved" &&
                     linkedTransfer?.status === "Approved" &&
-                    hospital?.id === "MMC-LIP" &&
+                    hospital?.id === selectedRequest.from &&
                     permissions.canApprove && (
                       <>
                         <div className="divider" />
@@ -1463,11 +1499,11 @@ function TransfersPage({
                     )}
 
                   {selectedRequest.status === "Partial Offer" &&
-                    permissions.secondary &&
+                    permissions.canCreateRequest &&
                     hospital?.id === selectedRequest.to && (
                       <div className="partial-offer-response">
                         <div>
-                          <strong>Mary Mediatrix has offered a smaller quantity.</strong>
+                          <strong>{hospitalById(selectedRequest.from)?.short || "The supplying blood bank"} has offered a smaller quantity.</strong>
                           <span>Accept {selectedRequest.offeredUnits} unit(s) to continue, or decline and close this request.</span>
                         </div>
                         <div className="row">
@@ -1921,7 +1957,7 @@ function TransfersPage({
                   </dl>
 
                   {selectedTransfer.status === "Approved" &&
-                    hospital?.id === "MMC-LIP" &&
+                    hospital?.id === selectedTransfer.from &&
                     permissions.canScan && (
                       <>
                         <div className="divider" />
@@ -1946,7 +1982,7 @@ function TransfersPage({
                     )}
 
                   {selectedTransfer.status === "In Transit" &&
-                    permissions.secondary &&
+                    permissions.canScan &&
                     hospital?.id === selectedTransfer.to && (
                       <>
                         <div className="divider" />
@@ -2205,7 +2241,7 @@ function TransfersPage({
           }
           sub={
             movementAction === "Outbound"
-              ? "This confirms that the approved blood units have left Mary Mediatrix."
+              ? `This confirms that the approved blood units have left ${hospitalById(selectedTransfer.from)?.short || "the supplying blood bank"}.`
               : "This confirms that the receiving hospital has accepted the blood units."
           }
           onClose={() => setMovementAction(null)}

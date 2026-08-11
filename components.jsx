@@ -384,13 +384,8 @@ function isSecondaryHospital(
 ) {
   return (
     !!hospital &&
-    ![
-      "MMC-LIP",
-      "PRC-LIP",
-      "DOH-CHD"
-    ].includes(
-      hospital.id
-    )
+    !hospital.is_blood_bank &&
+    !["PRC-LIP", "DOH-CHD"].includes(hospital.id)
   );
 }
 
@@ -408,6 +403,9 @@ function buildPermissions(
       session?.hospital
     );
 
+  const bloodBank =
+    Boolean(session?.hospital?.is_blood_bank);
+
   const readOnly =
     key ===
       "regulator" ||
@@ -421,8 +419,7 @@ function buildPermissions(
     key === "system";
 
   const bloodBankOperator =
-    !secondary &&
-    session?.hospital?.id === "MMC-LIP" &&
+    bloodBank &&
     ["admin", "technologist"].includes(key);
 
   return {
@@ -432,6 +429,8 @@ function buildPermissions(
     readOnly,
 
     secondary,
+
+    bloodBank,
 
     requester:
       secondary,
@@ -443,6 +442,9 @@ function buildPermissions(
 
     canViewInventory:
       bloodBankOperator,
+
+    canViewConsortium:
+      true,
 
     canViewTransfers:
       !canManageAccounts,
@@ -461,13 +463,13 @@ function buildPermissions(
       !canManageAccounts,
 
     canCreateRequest:
-      secondary &&
+      (secondary || bloodBank) &&
       !readOnly &&
       !canManageAccounts,
 
     canFullTransfer:
       !readOnly &&
-      !secondary &&
+      bloodBankOperator &&
       !canManageAccounts,
 
     canScan:
@@ -477,7 +479,7 @@ function buildPermissions(
     canApprove:
       key ===
         "admin" &&
-      !secondary,
+      bloodBank,
 
     canAcknowledge:
       !readOnly,
@@ -673,6 +675,18 @@ function Sidebar({
     },
 
     {
+      label: "Consortium",
+      items: [
+        {
+          id: "consortium",
+          name: "Consortium Inventory",
+          icon: "link",
+          show: permissions?.canViewConsortium,
+        },
+      ],
+    },
+
+    {
       label:
         "Compliance",
 
@@ -819,33 +833,34 @@ function Sidebar({
 
 
       <div className="sidebar-foot">
-        <div className="user-avatar">
-          {
-            user.initials
-          }
-        </div>
-
-        <div
-          style={{
-            flex:
-              1,
-
-            minWidth:
-              0,
-          }}
+        <button
+          className={`sidebar-profile-link ${active === "profile" ? "active" : ""}`}
+          onClick={() => onNav("profile")}
+          title="View my profile"
+          aria-label="View my profile"
         >
-          <div className="user-name">
+          <div className="user-avatar">
             {
-              user.name
+              user.initials
             }
           </div>
 
-          <div className="user-role">
-            {
-              user.role
-            }
+          <div className="sidebar-profile-copy">
+            <div className="user-name">
+              {
+                user.name
+              }
+            </div>
+
+            <div className="user-role">
+              {
+                user.role
+              }
+            </div>
           </div>
-        </div>
+
+          <I name="chevron" size={13} />
+        </button>
 
         <button
           className="btn btn-ghost btn-sm"

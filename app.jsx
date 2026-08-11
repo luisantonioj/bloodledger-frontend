@@ -78,6 +78,9 @@ function App() {
 
         role:
           "BLOOD BANK HEAD",
+
+        username:
+          "r.reyes@mmc.bloodledger",
       },
     });
 
@@ -250,6 +253,10 @@ function App() {
 
         type:
           payload.type,
+
+        component:
+          payload.component ||
+          "PRBC",
 
         units:
           payload.units,
@@ -562,6 +569,11 @@ function App() {
         : "Blood Unit Transactions",
     ],
 
+    consortium: [
+      "BloodLedger",
+      "Consortium Inventory",
+    ],
+
     transfers: [
       "BloodLedger",
       "Requests & Transfers",
@@ -585,6 +597,11 @@ function App() {
     accounts: [
       "BloodLedger",
       "Account Administration",
+    ],
+
+    profile: [
+      "BloodLedger",
+      "My Profile",
     ],
   };
 
@@ -692,6 +709,30 @@ function App() {
   ) {
     PageBody = (
       <AccountsPage
+        {...pageProps}
+      />
+    );
+  }
+
+
+  else if (
+    page ===
+    "consortium"
+  ) {
+    PageBody = (
+      <ConsortiumPage
+        {...pageProps}
+      />
+    );
+  }
+
+
+  else if (
+    page ===
+    "profile"
+  ) {
+    PageBody = (
+      <ProfilePage
         {...pageProps}
       />
     );

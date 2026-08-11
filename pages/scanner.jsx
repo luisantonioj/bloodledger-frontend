@@ -20,6 +20,9 @@ function ScannerPage({ hospital, permissions, onNav }) {
   const [confirming, setConfirming] = React.useState(false);
   const [history, setHistory] = React.useState(window.SCAN_HISTORY || []);
   const toast = React.useContext(ToastCtx);
+  const scanInventory = permissions?.bloodBank
+    ? facilityInventory(hospital)
+    : window.INVENTORY || [];
   const availableDirections = inboundOnly ? ["Inbound"] : ["Inbound", "Outbound"];
   const visibleHistory = inboundOnly
     ? history.filter((item) => (item.direction || "Inbound") === "Inbound")
@@ -70,8 +73,8 @@ function ScannerPage({ hospital, permissions, onNav }) {
     const scannedUnitId =
       direction === "Inbound"
         ? "=)W0381 2512 100118"
-        : "=)W0381 2509 100023";
-    const registeredUnit = (window.INVENTORY || []).find(
+        : scanInventory.find((unit) => unit.status === "Available")?.isbt || "=)W0381 2509 100023";
+    const registeredUnit = scanInventory.find(
       (unit) => unit.isbt === scannedUnitId
     );
 
@@ -114,7 +117,7 @@ function ScannerPage({ hospital, permissions, onNav }) {
 
   const previewScan = () => {
     const scanned = buildScanPreview();
-    const registered = (window.INVENTORY || []).some(
+    const registered = scanInventory.some(
       (unit) => unit.isbt === scanned.isbt
     );
 
@@ -142,7 +145,7 @@ function ScannerPage({ hospital, permissions, onNav }) {
 
     if (
       direction === "Outbound" &&
-      !(window.INVENTORY || []).some((unit) => unit.isbt === form.isbt.trim())
+      !scanInventory.some((unit) => unit.isbt === form.isbt.trim())
     ) {
       toast.push({
         kind: "warn",
@@ -186,7 +189,7 @@ function ScannerPage({ hospital, permissions, onNav }) {
 
     const nextHistory = [transaction, ...history];
 
-    const currentInventory = window.INVENTORY || [];
+    const currentInventory = scanInventory;
 
     if (direction === "Inbound") {
       const expiryTime = new Date(`${preview.expires}T00:00:00`).getTime();
@@ -209,14 +212,18 @@ function ScannerPage({ hospital, permissions, onNav }) {
         temp: null,
       };
 
-      window.INVENTORY = [
+      const nextInventory = [
         receivedUnit,
         ...currentInventory.filter((unit) => unit.isbt !== receivedUnit.isbt),
       ];
+      if (hospital?.id === "MMC-LIP") window.INVENTORY = nextInventory;
+      else window.INVENTORY_BY_FACILITY = { ...(window.INVENTORY_BY_FACILITY || {}), [hospital?.id]: nextInventory };
     } else {
-      window.INVENTORY = currentInventory.filter(
+      const nextInventory = currentInventory.filter(
         (unit) => unit.isbt !== preview.isbt
       );
+      if (hospital?.id === "MMC-LIP") window.INVENTORY = nextInventory;
+      else window.INVENTORY_BY_FACILITY = { ...(window.INVENTORY_BY_FACILITY || {}), [hospital?.id]: nextInventory };
     }
 
     setHistory(nextHistory);

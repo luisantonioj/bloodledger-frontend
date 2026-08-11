@@ -1,231 +1,154 @@
-// pages/consortium.jsx — Network view across the 5 hospitals + regulator
+// pages/consortium.jsx - Network-wide participating blood-bank availability.
 
-function ConsortiumPage({ onNav }) {
-  const matrix = window.CITY_MATRIX;
-  const hospitals = HOSPITALS.filter((h) => h.type !== "Regulator");
+function ConsortiumPage({ hospital, permissions, onNav }) {
+  const banks = window.CONSORTIUM_BANKS || [];
+  const [component, setComponent] = React.useState("PRBC");
+  const [view, setView] = React.useState("Network Total");
+  const [selectedType, setSelectedType] = React.useState("ALL");
+  const factor = (window.CONSORTIUM_COMPONENT_FACTORS || {})[component] || 1;
+  const canRequest = Boolean(permissions?.canCreateRequest);
+  const showOnHand = Boolean(permissions?.bloodBank || permissions?.readOnly || permissions?.canManageAccounts);
 
-  // sum per blood type across consortium
-  const totals = {};
-  BLOOD_TYPES.forEach((t) => {
-    totals[t] = hospitals.reduce((s, h) => s + (matrix[h.id]?.[t] || 0), 0);
+  const adjusted = (value) => Math.max(0, Math.round(Number(value || 0) * factor));
+  const bankRows = banks.map((bank) => {
+    const facility = hospitalById(bank.facilityId);
+    const inventory = {};
+    BLOOD_TYPES.forEach((type) => {
+      const source = bank.inventory[type] || { total: 0, available: 0 };
+      inventory[type] = {
+        total: adjusted(source.total),
+        available: adjusted(source.available),
+      };
+    });
+    return { ...bank, facility, inventory };
   });
-  const grandTotal = Object.values(totals).reduce((a, b) => a + b, 0);
 
-  // status by total
-  const statusFor = (t) => {
-    const v = totals[t];
-    if (v < 8) return "critical";
-    if (v < 20) return "warn";
-    if (v > 60) return "surplus";
-    return "ok";
+  const totals = {};
+  BLOOD_TYPES.forEach((type) => {
+    totals[type] = bankRows.reduce(
+      (result, bank) => ({
+        total: result.total + bank.inventory[type].total,
+        available: result.available + bank.inventory[type].available,
+      }),
+      { total: 0, available: 0 }
+    );
+  });
+
+  const totalOnHand = Object.values(totals).reduce((sum, item) => sum + item.total, 0);
+  const totalAvailable = Object.values(totals).reduce((sum, item) => sum + item.available, 0);
+  const criticalTypes = Object.values(totals).filter((item) => item.available === 0).length;
+  const chartMax = Math.max(5, ...Object.values(totals).map((item) => item.available));
+
+  const availabilityKind = (available) =>
+    available === 0 ? "critical" : available <= 2 ? "warn" : "ok";
+
+  const requestFrom = (bank, type) => {
+    onNav("transfers", {
+      type: type === "ALL" ? "O+" : type,
+      supplierId: bank.facilityId,
+      component,
+    });
   };
 
   return (
-    <div className="page">
+    <div className="page consortium-page">
       <PageHead
-        eyebrow="Network · Lipa City consortium"
-        title="Consortium View"
-        sub="Cross-chapter inventory and live routes. Cells display the latest committed block from each peer; data leaves your chapter only as encrypted endorsements."
-        actions={
-          <>
-            <Btn icon="filter" size="sm">PRBC</Btn>
-            <Btn icon="download" size="sm">Export consortium</Btn>
-          </>
+        eyebrow="BloodLedger · Lipa City consortium"
+        title="Consortium Inventory"
+        sub={
+          permissions?.secondary
+            ? "Find blood units released for redistribution by participating blood banks."
+            : "Monitor on-hand and redistributable blood supply across participating hospital blood banks."
         }
+        actions={<Chip kind="ok" dot>Network synchronized</Chip>}
       />
 
-      <div className="grid-dash">
-        {/* Heatmap */}
-        <div className="card">
-          <div className="card-h">
-            <h3>Inventory heatmap</h3>
-            <div className="sub muted">PRBC units · by chapter × group</div>
-            <div className="actions row" style={{ gap: 6 }}>
-              <Chip kind="critical" dot>Critical</Chip>
-              <Chip kind="warn" dot>Low</Chip>
-              <Chip kind="ok" dot>Sufficient</Chip>
-              <Chip kind="info" dot>Surplus</Chip>
-            </div>
-          </div>
-          <div className="card-b flush" style={{ overflow: "auto" }}>
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th style={{ minWidth: 180 }}>Chapter</th>
-                  {BLOOD_TYPES.map((t) => <th key={t} className="right">{t}</th>)}
-                  <th className="right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {hospitals.map((h) => {
-                  const row = matrix[h.id] || {};
-                  const total = Object.values(row).reduce((a, b) => a + b, 0);
-                  return (
-                    <tr key={h.id}>
-                      <td>
-                        <div className="row">
-                          <span className={`peer-dot`} style={{ background: "var(--ok)" }} />
-                          <div>
-                            <div style={{ fontWeight: 500 }}>{h.short}</div>
-                            <div className="muted tiny">{h.type} · {h.distance_km.toFixed(1)} km</div>
-                          </div>
-                        </div>
-                      </td>
-                      {BLOOD_TYPES.map((t) => {
-                        const v = row[t] || 0;
-                        const bg = v === 0 ? "transparent"
-                          : v < 3 ? "rgba(193,47,47,0.16)"
-                          : v < 8 ? "rgba(176,102,12,0.16)"
-                          : v > 30 ? "rgba(35,79,158,0.14)"
-                          : "rgba(46,125,92,0.13)";
-                        return (
-                          <td key={t} className="right tnum mono" style={{ background: bg, fontWeight: v > 30 ? 600 : 500 }}>
-                            {v}
-                          </td>
-                        );
-                      })}
-                      <td className="right tnum" style={{ fontWeight: 600 }}>{total}</td>
-                    </tr>
-                  );
-                })}
-                <tr style={{ background: "var(--bg-2)" }}>
-                  <td style={{ fontWeight: 600 }}>Consortium total</td>
-                  {BLOOD_TYPES.map((t) => (
-                    <td key={t} className="right tnum mono" style={{ fontWeight: 600 }}>
-                      {totals[t]}
-                      <div><Chip kind={statusFor(t) === "critical" ? "critical" : statusFor(t) === "warn" ? "warn" : statusFor(t) === "surplus" ? "info" : "ok"} dot>{statusFor(t)}</Chip></div>
-                    </td>
-                  ))}
-                  <td className="right tnum" style={{ fontWeight: 700 }}>{grandTotal}</td>
-                </tr>
-              </tbody>
-            </table>
+      <div className="consortium-summary-grid">
+        <Stat label="Participating Blood Banks" value={bankRows.length} unit="online" accent="ok" />
+        <Stat label={showOnHand ? "Network Inventory" : "Network Availability"} value={showOnHand ? totalOnHand : totalAvailable} unit={`${component} units`} />
+        <Stat label="Available to Redistribute" value={totalAvailable} unit="units" accent="info" />
+        <Stat label="Unavailable Blood Types" value={criticalTypes} unit={criticalTypes === 1 ? "type" : "types"} accent={criticalTypes ? "critical" : "ok"} />
+      </div>
+
+      <div className="consortium-controls card">
+        <div>
+          <span className="consortium-control-label">Blood Component</span>
+          <div className="consortium-filter-row">
+            {(window.COMPONENTS || []).map((item) => (
+              <button key={item} className={`filter-chip ${component === item ? "active" : ""}`} onClick={() => setComponent(item)}>{item}</button>
+            ))}
           </div>
         </div>
-
-        {/* Map / topology */}
-        <div className="card">
-          <div className="card-h">
-            <h3>Network topology</h3>
-            <div className="sub muted">5 peers + regulator · Lipa City</div>
+        <div>
+          <span className="consortium-control-label">Chart View</span>
+          <div className="consortium-filter-row">
+            {["Network Total", "Compare Blood Banks"].map((item) => (
+              <button key={item} className={`filter-chip ${view === item ? "active" : ""}`} onClick={() => setView(item)}>{item}</button>
+            ))}
           </div>
-          <div className="card-b" style={{ padding: 0 }}>
-            <NetworkMap onNav={onNav} />
-            <div style={{ padding: 14 }}>
-              <div className="muted tiny" style={{ letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>
-                Live routes
-              </div>
-              {window.TRANSFERS.filter((t) => t.status !== "Received").map((t) => (
-                <div key={t.id} className="row" style={{ padding: "8px 0", borderBottom: "1px solid var(--line-2)" }}>
-                  <Chip kind={t.status === "In Transit" ? "warn" : "info"} dot>{t.status}</Chip>
-                  <div className="small" style={{ flex: 1 }}>
-                    {hospitalById(t.from).short} <I name="arrowRight" size={11} /> {hospitalById(t.to).short}
-                  </div>
-                  <BloodType type={t.type} />
-                  <span className="mono small">×{t.units}</span>
+        </div>
+      </div>
+
+      <div className="card consortium-chart-card">
+        <div className="card-h">
+          <div><h3>Redistributable Blood Availability</h3><div className="sub muted">Units each blood bank has released above its local safety-stock threshold.</div></div>
+          <div className="consortium-bank-legend">
+            {view === "Compare Blood Banks" && bankRows.map((bank, index) => <span key={bank.facilityId}><i className={`bank-${index + 1}`} />{bank.facility.short}</span>)}
+          </div>
+        </div>
+        <div className="card-b consortium-chart-scroll">
+          <div className="consortium-chart" aria-label={`${component} redistributable inventory chart`}>
+            {BLOOD_TYPES.map((type) => (
+              <button key={type} className={`consortium-chart-group ${selectedType === type ? "selected" : ""}`} onClick={() => setSelectedType(selectedType === type ? "ALL" : type)}>
+                <div className="consortium-chart-values">
+                  {view === "Network Total" ? (
+                    <span className={`consortium-chart-bar network ${availabilityKind(totals[type].available)}`} style={{ height: `${Math.max(3, (totals[type].available / chartMax) * 100)}%` }}><b>{totals[type].available}</b></span>
+                  ) : bankRows.map((bank, index) => {
+                    const value = bank.inventory[type].available;
+                    return <span key={bank.facilityId} className={`consortium-chart-bar bank-${index + 1}`} style={{ height: `${Math.max(3, (value / chartMax) * 100)}%` }} title={`${bank.facility.short}: ${value} ${type} ${component} unit(s) available`}><b>{value}</b></span>;
+                  })}
                 </div>
-              ))}
-            </div>
+                <strong>{type}</strong>
+                <small>{totals[type].available ? `${totals[type].available} available` : "Unavailable"}</small>
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
       <div style={{ height: 18 }} />
 
-      <div className="card">
+      <div className="card consortium-matrix-card">
         <div className="card-h">
-          <h3>Channel peers</h3>
-          <div className="sub muted">bloodledger-mainnet · Hyperledger Fabric 2.5</div>
+          <div><h3>Blood Bank Availability Matrix</h3><div className="sub muted">{showOnHand ? "Each cell shows redistributable units and total on-hand stock." : "Only units approved for redistribution are shown to requestor facilities."}</div></div>
+          {selectedType !== "ALL" && <Btn size="sm" kind="ghost" onClick={() => setSelectedType("ALL")}>Clear {selectedType} filter</Btn>}
         </div>
-        <div className="card-b flush">
-          <table className="tbl">
-            <thead><tr>
-              <th>Peer</th><th>Organization</th><th>Endorsement</th><th>Latest block</th><th>Latency</th><th>Status</th><th>Anchor</th>
-            </tr></thead>
+        <div className="card-b flush consortium-table-scroll">
+          <table className="tbl consortium-matrix">
+            <thead><tr><th>Participating Blood Bank</th>{BLOOD_TYPES.map((type) => <th key={type} className={selectedType !== "ALL" && selectedType !== type ? "muted-column" : ""}>{type}</th>)}<th>Redistributable</th><th>Network Status</th><th></th></tr></thead>
             <tbody>
-              {[
-                { p: "peer0.prc-lipa", o: "PRC Lipa Chapter", e: "Endorser, Anchor", b: 124892, lat: "12 ms", s: "Healthy", a: true },
-                { p: "peer0.mmc", o: "Mary Mediatrix", e: "Endorser", b: 124892, lat: "8 ms", s: "Healthy", a: false },
-                { p: "peer0.lmc", o: "Lipa Medix", e: "Endorser", b: 124892, lat: "14 ms", s: "Healthy", a: false },
-                { p: "peer0.mdh", o: "Metro Doctors", e: "Endorser", b: 124891, lat: "22 ms", s: "Catching up", a: false },
-                { p: "peer0.clh", o: "C. Laurel Memorial", e: "Endorser", b: 124892, lat: "18 ms", s: "Healthy", a: false },
-                { p: "regulator0.doh", o: "DOH-CHD Calabarzon", e: "Read-only", b: 124892, lat: "31 ms", s: "Healthy", a: true },
-              ].map((r) => (
-                <tr key={r.p}>
-                  <td className="mono small">{r.p}</td>
-                  <td>{r.o}</td>
-                  <td className="small">{r.e}</td>
-                  <td className="mono small">#{r.b.toLocaleString()}</td>
-                  <td className="mono small">{r.lat}</td>
-                  <td>{r.s === "Healthy" ? <Chip kind="ok" dot>{r.s}</Chip> : <Chip kind="warn" dot>{r.s}</Chip>}</td>
-                  <td>{r.a ? <Chip kind="info" dot>Anchor</Chip> : <span className="muted">—</span>}</td>
-                </tr>
-              ))}
+              {bankRows.map((bank) => {
+                const available = Object.values(bank.inventory).reduce((sum, item) => sum + item.available, 0);
+                const onHand = Object.values(bank.inventory).reduce((sum, item) => sum + item.total, 0);
+                return <tr key={bank.facilityId}>
+                  <td><div className="consortium-bank-name"><span className="peer-dot" /><div><strong>{bank.facility.name}</strong><small>{bank.facility.type} · {bank.facility.distance_km.toFixed(1)} km away</small></div></div></td>
+                  {BLOOD_TYPES.map((type) => {
+                    const item = bank.inventory[type];
+                    return <td key={type} className={selectedType !== "ALL" && selectedType !== type ? "muted-column" : ""}><span className={`availability-cell ${availabilityKind(item.available)}`}><strong>{item.available}</strong>{showOnHand && <small>of {item.total}</small>}</span></td>;
+                  })}
+                  <td><strong>{available}</strong>{showOnHand && <small className="muted"> of {onHand} total</small>}</td>
+                  <td><Chip kind="ok" dot>{bank.status}</Chip><div className="muted tiny">Updated {bank.lastUpdated.slice(11)}</div></td>
+                  <td className="right">{canRequest && bank.facilityId !== hospital?.id ? <Btn size="sm" kind="ghost" onClick={() => requestFrom(bank, selectedType)}>Request</Btn> : bank.facilityId === hospital?.id ? <Chip kind="info">Current facility</Chip> : null}</td>
+                </tr>;
+              })}
             </tbody>
           </table>
         </div>
       </div>
+
+      <div className="consortium-disclosure"><I name="info" size={16} /><span>Redistributable quantities exclude reserved units and each blood bank's configured safety stock. Availability remains subject to Blood Bank Head approval and release validation.</span></div>
     </div>
   );
 }
 
-function NetworkMap({ onNav }) {
-  // Positions chosen by hand for a clean schematic; SVG viewBox 0 0 600 360.
-  const nodes = [
-    { id: "PRC-LIP", x: 300, y: 90,  label: "PRC Lipa", role: "Hub", color: "var(--blood)" },
-    { id: "MMC-LIP", x: 160, y: 200, label: "Mary Mediatrix", role: "Tertiary", color: "var(--ink)", self: true },
-    { id: "LMC-LIP", x: 440, y: 200, label: "Lipa Medix", role: "Level II", color: "var(--ink)" },
-    { id: "MDH-LIP", x: 230, y: 310, label: "Metro Doctors", role: "Level II", color: "var(--ink)" },
-    { id: "CLH-LIP", x: 380, y: 310, label: "C. Laurel", role: "Level I", color: "var(--ink)" },
-    { id: "DOH-CHD", x: 540, y: 60,  label: "DOH-CHD", role: "Regulator", color: "var(--info)" },
-  ];
-  const links = [
-    ["PRC-LIP", "MMC-LIP", "live"],
-    ["PRC-LIP", "LMC-LIP"],
-    ["PRC-LIP", "MDH-LIP"],
-    ["PRC-LIP", "CLH-LIP"],
-    ["MMC-LIP", "MDH-LIP", "live"],
-    ["MMC-LIP", "LMC-LIP"],
-    ["LMC-LIP", "MMC-LIP", "live"],
-    ["DOH-CHD", "PRC-LIP", "read"],
-  ];
-  const nById = (id) => nodes.find((n) => n.id === id);
-  return (
-    <svg viewBox="0 0 600 380" style={{ width: "100%", height: 280, background: "var(--bg)" }}>
-      <defs>
-        <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
-          <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="1" />
-        </pattern>
-      </defs>
-      <rect width="600" height="380" fill="url(#grid)" />
-      {links.map(([a, b, kind], i) => {
-        const A = nById(a), B = nById(b);
-        const stroke = kind === "live" ? "var(--blood)" : kind === "read" ? "var(--info)" : "var(--line-strong)";
-        const dash = kind === "read" ? "4 4" : "";
-        const sw = kind === "live" ? 2 : 1;
-        return (
-          <g key={i}>
-            <line x1={A.x} y1={A.y} x2={B.x} y2={B.y} stroke={stroke} strokeWidth={sw} strokeDasharray={dash} opacity={kind === "live" ? 1 : 0.6} />
-            {kind === "live" && (
-              <circle r="4" fill="var(--blood)">
-                <animateMotion dur="2.2s" repeatCount="indefinite"
-                  path={`M${A.x},${A.y} L${B.x},${B.y}`} />
-              </circle>
-            )}
-          </g>
-        );
-      })}
-      {nodes.map((n) => (
-        <g key={n.id} onClick={() => onNav("inventory")} style={{ cursor: "pointer" }}>
-          <circle cx={n.x} cy={n.y} r={n.self ? 22 : 16} fill={n.self ? "#fff" : n.color} stroke={n.self ? "var(--blood)" : "var(--ink)"} strokeWidth={n.self ? 2 : 1} />
-          {n.self && <circle cx={n.x} cy={n.y} r="6" fill="var(--blood)" />}
-          {!n.self && <text x={n.x} y={n.y + 4} textAnchor="middle" fontFamily="var(--font-mono)" fontSize="10" fill="#fff">{n.id.split("-")[0].slice(0, 3)}</text>}
-          <text x={n.x} y={n.y + (n.y > 200 ? 36 : -26)} textAnchor="middle" fontSize="11.5" fontFamily="var(--font-display)" fill="var(--ink)" fontWeight="500">{n.label}</text>
-          <text x={n.x} y={n.y + (n.y > 200 ? 50 : -12)} textAnchor="middle" fontSize="9.5" fill="var(--ink-3)" letterSpacing="0.08em" textTransform="uppercase">{n.role.toUpperCase()}</text>
-        </g>
-      ))}
-    </svg>
-  );
-}
-
-Object.assign(window, { ConsortiumPage, NetworkMap });
+Object.assign(window, { ConsortiumPage });

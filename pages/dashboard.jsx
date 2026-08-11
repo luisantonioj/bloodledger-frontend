@@ -7,9 +7,36 @@
 // after stakeholder interviews.
 
 function DashboardPage({ hospital, permissions, transfers, onNav, onAct }) {
-  const matrix = window.MATRIX || [];
-  const alerts = window.ALERTS || [];
-  const transferData = transfers || window.TRANSFERS || [];
+  const consortiumBank = (window.CONSORTIUM_BANKS || []).find(
+    (item) => item.facilityId === hospital?.id
+  );
+  const matrix = consortiumBank
+    ? (window.BLOOD_TYPES || []).map((type) => {
+        const item = consortiumBank.inventory[type] || { total: 0, available: 0 };
+        const status = item.total <= 2
+          ? "critical"
+          : item.total <= 5
+          ? "warn"
+          : item.available >= 4
+          ? "surplus"
+          : "ok";
+        return {
+          type,
+          units: item.total,
+          status,
+          redistributable_units: item.available,
+          trend: 0,
+          days_cover: Math.max(1, Math.round((item.total / 4) * 10) / 10),
+        };
+      })
+    : window.MATRIX || [];
+  const alerts = (window.ALERTS || []).filter(
+    (alert) => !alert.hospitalId || alert.hospitalId === hospital?.id
+  );
+  const allTransferData = transfers || window.TRANSFERS || [];
+  const transferData = permissions?.bloodBank || permissions?.secondary
+    ? allTransferData.filter((item) => item.from === hospital?.id || item.to === hospital?.id)
+    : allTransferData;
 
   if (permissions?.requester) {
     return (
@@ -403,6 +430,8 @@ function DashboardPage({ hospital, permissions, transfers, onNav, onAct }) {
 }
 
 function RequestorDashboard({ hospital, transfers, onNav }) {
+  const [networkType, setNetworkType] = React.useState("O+");
+  const [networkComponent, setNetworkComponent] = React.useState("PRBC");
   const requests = transfers.filter(
     (item) => item.to === hospital?.id || item.from === hospital?.id
   );
@@ -410,6 +439,15 @@ function RequestorDashboard({ hospital, transfers, onNav }) {
   const inTransit = requests.filter((item) => ["Approved", "Dispatched", "In Transit"].includes(item.status)).length;
   const received = requests.filter((item) => ["Received", "Completed"].includes(item.status)).length;
   const recent = requests.slice(0, 6);
+  const componentFactor = (window.CONSORTIUM_COMPONENT_FACTORS || {})[networkComponent] || 1;
+  const networkBanks = (window.CONSORTIUM_BANKS || []).map((bank) => {
+    const source = bank.inventory[networkType] || { available: 0 };
+    return {
+      ...bank,
+      facility: hospitalById(bank.facilityId),
+      available: Math.max(0, Math.round(source.available * componentFactor)),
+    };
+  }).sort((a, b) => b.available - a.available || a.facility.distance_km - b.facility.distance_km);
 
   return (
     <div className="page">
@@ -449,12 +487,27 @@ function RequestorDashboard({ hospital, transfers, onNav }) {
           </div>
         </div>
 
-        <div className="card">
-          <div className="card-h"><div><h3>Requestor Access</h3><div className="sub muted">Available functions for this account.</div></div></div>
-          <div className="card-b requestor-access-list">
-            <div><I name="check" size={14} /><span><strong>Submit requests</strong><small>Create blood requests for review by the primary blood bank.</small></span></div>
-            <div><I name="check" size={14} /><span><strong>Track transfers</strong><small>Monitor approval, dispatch, transit, and receipt.</small></span></div>
-            <div><I name="check" size={14} /><span><strong>Review activity</strong><small>See request-related notifications and history.</small></span></div>
+        <div className="card requestor-network-card">
+          <div className="card-h">
+            <div><h3>Network Blood Availability</h3><div className="sub muted">Redistributable supply from all participating blood banks.</div></div>
+            <Btn size="sm" kind="ghost" onClick={() => onNav("consortium")}>Full inventory <I name="arrowRight" size={12} /></Btn>
+          </div>
+          <div className="card-b">
+            <div className="requestor-network-filters">
+              <label><span>Blood Type</span><select value={networkType} onChange={(event) => setNetworkType(event.target.value)}>{(window.BLOOD_TYPES || []).map((type) => <option key={type}>{type}</option>)}</select></label>
+              <label><span>Component</span><select value={networkComponent} onChange={(event) => setNetworkComponent(event.target.value)}>{(window.COMPONENTS || []).map((item) => <option key={item}>{item}</option>)}</select></label>
+            </div>
+            <div className="requestor-supplier-list">
+              {networkBanks.map((bank) => (
+                <div key={bank.facilityId}>
+                  <span className="peer-dot" />
+                  <div><strong>{bank.facility.short}</strong><small>{bank.facility.distance_km.toFixed(1)} km · updated {bank.lastUpdated.slice(11)}</small></div>
+                  <div className="requestor-supplier-quantity"><strong>{bank.available}</strong><span>available</span></div>
+                  <Btn size="sm" kind={bank.available ? "ghost" : "default"} disabled={!bank.available} onClick={() => onNav("transfers", { type: networkType, component: networkComponent, supplierId: bank.facilityId })}>Request</Btn>
+                </div>
+              ))}
+            </div>
+            <div className="requestor-network-note"><I name="info" size={14} /> Quantities exclude reserved and safety-stock units and remain subject to supplier approval.</div>
           </div>
         </div>
       </div>

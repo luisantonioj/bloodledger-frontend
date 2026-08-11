@@ -21,12 +21,19 @@ function InventoryPage({ hospital, permissions, filter, onNav }) {
   }, [filter?.type]);
 
   const inventory = React.useMemo(
-    () => window.INVENTORY || [],
-    [inventoryVersion]
+    () => facilityInventory(hospital),
+    [inventoryVersion, hospital?.id]
   );
 
   const importUnits = (units) => {
-    window.INVENTORY = [...(window.INVENTORY || []), ...units];
+    if (hospital?.id === "MMC-LIP") {
+      window.INVENTORY = [...(window.INVENTORY || []), ...units];
+    } else {
+      window.INVENTORY_BY_FACILITY = {
+        ...(window.INVENTORY_BY_FACILITY || {}),
+        [hospital?.id]: [...facilityInventory(hospital), ...units],
+      };
+    }
     setInventoryVersion((version) => version + 1);
     setImportOpen(false);
     toast.push({
@@ -420,6 +427,36 @@ function InventoryPage({ hospital, permissions, filter, onNav }) {
       )}
     </div>
   );
+}
+
+function facilityInventory(hospital) {
+  if (!hospital?.id || hospital.id === "MMC-LIP") return window.INVENTORY || [];
+  window.INVENTORY_BY_FACILITY = window.INVENTORY_BY_FACILITY || {};
+  if (window.INVENTORY_BY_FACILITY[hospital.id]) return window.INVENTORY_BY_FACILITY[hospital.id];
+
+  const bank = (window.CONSORTIUM_BANKS || []).find((item) => item.facilityId === hospital.id);
+  if (!bank) return [];
+  const generated = [];
+  (window.BLOOD_TYPES || []).forEach((type) => {
+    const stock = bank.inventory[type] || { total: 0, available: 0 };
+    for (let index = 0; index < stock.total; index += 1) {
+      generated.push({
+        isbt: `NET-${hospital.id}-${type.replace("+", "P").replace("-", "N")}-${String(index + 1).padStart(4, "0")}`,
+        type,
+        comp: "PRBC",
+        collected: "2026-07-18",
+        expires: `2026-09-${String(10 + (index % 16)).padStart(2, "0")}`,
+        days_left: 30 + (index % 16),
+        status: "Available",
+        reserved_for: index < Math.max(0, stock.total - stock.available) ? "Local safety stock" : null,
+        source: "PRC-LIP",
+        shelf: `R-${1 + (index % 3)} / ${type}`,
+        temp: 4.0 + (index % 4) / 10,
+      });
+    }
+  });
+  window.INVENTORY_BY_FACILITY[hospital.id] = generated;
+  return generated;
 }
 
 function InventoryImportModal({ existingInventory, onClose, onImport }) {
