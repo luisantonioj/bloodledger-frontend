@@ -443,8 +443,11 @@ function buildPermissions(
     canViewInventory:
       bloodBankOperator,
 
+    // The full network matrix is an operational tool for participating blood
+    // banks. Requestors, PRC, and DOH receive role-specific network summaries
+    // directly on their dashboards instead of a duplicate navigation tab.
     canViewConsortium:
-      true,
+      bloodBank,
 
     canViewTransfers:
       !canManageAccounts,

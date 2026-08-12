@@ -18,7 +18,8 @@ The proposal defines a tiered stakeholder network. The frontend must serve all f
 | **Blood Bank Head** | Mary Mediatrix Medical Center (primary node) | Everything a Med Technologist can do, plus approve/override/reconcile transfers, sign off with a PIN | Full operational + approval access |
 | **PRC Officer** | Philippine Red Cross Lipa Chapter (regulatory/hub node) | Hub-level distribution visibility, city-wide post-dispatch tracking | Full blockchain node; read-only city-wide view after dispatch |
 | **Regulator (DOH)** | DOH-CHD Calabarzon | City-wide audit trail, aggregated reporting/KPIs for compliance filings | Read-only dashboard, reporting, and audit access; no write actions anywhere |
-| *(Secondary hospitals — Lipa Medix, Metro Doctors, C. Laurel Memorial)* | Recipient institutions without their own blood bank | Submit digital requests, track transfer status | Read-only dashboard + request submission only, no scanning/inventory-write |
+| *(Participating blood banks — Lipa Medix Medical Center and N.L. Villa Memorial Medical Center)* | Consortium blood-bank institutions | Share approved stock availability, authorize requests, and track transfers | Access depends on the assigned institutional role |
+| *(Secondary requestors — Metro Lipa Medical Center and other approved facilities)* | Recipient institutions without a consortium blood bank | View redistributable availability, submit requests, and track receipt | Dashboard summary and request workflow; no inventory-write access |
 
 The login screen (`pages/login.jsx`) is the canonical reference for these four roles and their one-line descriptions — keep any future role-permission work consistent with that copy.
 

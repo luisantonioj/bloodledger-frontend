@@ -48,6 +48,14 @@ function DashboardPage({ hospital, permissions, transfers, onNav, onAct }) {
     );
   }
 
+  if (permissions?.roleKey === "prc") {
+    return <PrcDashboard hospital={hospital} onNav={onNav} />;
+  }
+
+  if (permissions?.roleKey === "regulator") {
+    return <RegulatoryDashboard hospital={hospital} onNav={onNav} />;
+  }
+
   // Basic inventory summary
   const totalUnits = matrix.reduce((sum, item) => {
     return sum + (Number(item.units) || 0);
@@ -490,7 +498,6 @@ function RequestorDashboard({ hospital, transfers, onNav }) {
         <div className="card requestor-network-card">
           <div className="card-h">
             <div><h3>Network Blood Availability</h3><div className="sub muted">Redistributable supply from all participating blood banks.</div></div>
-            <Btn size="sm" kind="ghost" onClick={() => onNav("consortium")}>Full inventory <I name="arrowRight" size={12} /></Btn>
           </div>
           <div className="card-b">
             <div className="requestor-network-filters">
@@ -511,6 +518,169 @@ function RequestorDashboard({ hospital, transfers, onNav }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function consortiumDashboardData() {
+  const banks = (window.CONSORTIUM_BANKS || []).map((bank) => {
+    const facility = hospitalById(bank.facilityId);
+    const totals = Object.values(bank.inventory || {}).reduce(
+      (summary, item) => ({
+        total: summary.total + (Number(item.total) || 0),
+        available: summary.available + (Number(item.available) || 0),
+      }),
+      { total: 0, available: 0 }
+    );
+    return { ...bank, facility, ...totals };
+  });
+  const byType = (window.BLOOD_TYPES || []).map((type) => {
+    const available = banks.reduce(
+      (sum, bank) => sum + (Number(bank.inventory?.[type]?.available) || 0),
+      0
+    );
+    return { type, available };
+  });
+  return {
+    banks,
+    byType,
+    total: banks.reduce((sum, bank) => sum + bank.total, 0),
+    available: banks.reduce((sum, bank) => sum + bank.available, 0),
+    shortages: byType.filter((item) => item.available <= 1).length,
+  };
+}
+
+function NetworkAvailabilitySummary({ data }) {
+  return (
+    <div className="card">
+      <div className="card-h">
+        <div>
+          <h3>Consortium Availability Summary</h3>
+          <div className="sub muted">Redistributable PRBC units reported across participating blood banks.</div>
+        </div>
+      </div>
+      <div className="card-b">
+        <div className="dashboard-network-types">
+          {data.byType.map((item) => (
+            <div key={item.type} className={item.available <= 1 ? "critical" : item.available <= 3 ? "warn" : "ok"}>
+              <BloodType type={item.type} />
+              <strong className="mono">{item.available}</strong>
+              <span>available</span>
+            </div>
+          ))}
+        </div>
+        <div className="requestor-network-note"><I name="info" size={14} /> This summary excludes reserved units and institutional safety stock.</div>
+      </div>
+    </div>
+  );
+}
+
+function PrcDashboard({ hospital, onNav }) {
+  const network = consortiumDashboardData();
+  const supplyRequests = window.PRC_SUPPLY_REQUESTS || [];
+  const openSupply = supplyRequests.filter((item) => !["Completed", "Cancelled"].includes(item.status)).length;
+
+  return (
+    <div className="page">
+      <PageHead
+        eyebrow={hospital?.short || "Philippine Red Cross"}
+        title="PRC Supply Coordination"
+        sub="Monitor consortium shortages and coordinate replenishment with participating blood banks."
+      />
+      <div className="stat-grid">
+        <Stat label="Participating Blood Banks" value={network.banks.length} unit="facilities" />
+        <Stat label="Redistributable Supply" value={network.available} unit="units" accent="ok" />
+        <Stat label="Critical Blood Types" value={network.shortages} unit="types" accent={network.shortages ? "critical" : undefined} />
+        <Stat label="Open Supply Requests" value={openSupply} unit="requests" accent={openSupply ? "info" : undefined} />
+      </div>
+      <div style={{ height: 18 }} />
+      <div className="grid-dash role-dashboard-grid">
+        <NetworkAvailabilitySummary data={network} />
+        <div className="card">
+          <div className="card-h">
+            <div><h3>Blood-Bank Reporting Status</h3><div className="sub muted">Latest stock update received from each consortium member.</div></div>
+          </div>
+          <div className="card-b flush">
+            <table className="tbl">
+              <thead><tr><th>Blood Bank</th><th>Updated</th><th className="right">Available</th><th>Status</th></tr></thead>
+              <tbody>{network.banks.map((bank) => (
+                <tr key={bank.facilityId}>
+                  <td><strong>{bank.facility.short}</strong></td>
+                  <td className="mono tiny">{bank.lastUpdated}</td>
+                  <td className="right mono">{bank.available}</td>
+                  <td><Chip kind="ok" dot>{bank.status}</Chip></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div style={{ height: 18 }} />
+      <div className="card">
+        <div className="card-h">
+          <div><h3>Hospital Replenishment Requests</h3><div className="sub muted">Requests sent to PRC for blood-bank stock replenishment.</div></div>
+          <Btn size="sm" kind="ghost" onClick={() => onNav("transfers")}>Open coordination records <I name="arrowRight" size={12} /></Btn>
+        </div>
+        <div className="card-b flush">
+          <table className="tbl">
+            <thead><tr><th>Reference</th><th>Blood</th><th className="right">Units</th><th>Needed By</th><th>Status</th></tr></thead>
+            <tbody>{supplyRequests.slice(0, 5).map((item) => (
+              <tr key={item.id}>
+                <td className="mono tiny">{item.id}</td>
+                <td><BloodType type={item.type} /> <span className="tiny muted">{item.component}</span></td>
+                <td className="right mono">{item.units}</td>
+                <td className="mono tiny">{String(item.neededBy || "").replace("T", " ")}</td>
+                <td><Chip kind={transferStatusKind(item.status)} dot>{item.status}</Chip></td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RegulatoryDashboard({ hospital, onNav }) {
+  const network = consortiumDashboardData();
+
+  return (
+    <div className="page">
+      <PageHead
+        eyebrow={hospital?.short || "DOH CALABARZON"}
+        title="Regulatory Oversight Dashboard"
+        sub="Read-only oversight of consortium participation, reporting activity, and blood availability."
+        actions={<Btn size="sm" kind="ghost" onClick={() => onNav("reporting")}>View compliance reports <I name="arrowRight" size={12} /></Btn>}
+      />
+      <div className="stat-grid">
+        <Stat label="Registered Blood Banks" value={network.banks.length} unit="facilities" />
+        <Stat label="Facilities Reporting" value={network.banks.filter((bank) => bank.status === "Online").length} unit={`of ${network.banks.length}`} accent="ok" />
+        <Stat label="Network Stock" value={network.total} unit="units" />
+        <Stat label="Redistributable Supply" value={network.available} unit="units" accent="info" />
+      </div>
+      <div style={{ height: 18 }} />
+      <div className="grid-dash role-dashboard-grid">
+        <div className="card">
+          <div className="card-h">
+            <div><h3>Consortium Facility Overview</h3><div className="sub muted">High-level reporting status; operational unit-level data remains with each blood bank.</div></div>
+          </div>
+          <div className="card-b flush">
+            <table className="tbl">
+              <thead><tr><th>Licensed Facility</th><th className="right">On Hand</th><th className="right">Redistributable</th><th>Last Report</th><th>Status</th></tr></thead>
+              <tbody>{network.banks.map((bank) => (
+                <tr key={bank.facilityId}>
+                  <td><strong>{bank.facility.name}</strong><div className="tiny muted">{bank.facility.type}</div></td>
+                  <td className="right mono">{bank.total}</td>
+                  <td className="right mono">{bank.available}</td>
+                  <td className="mono tiny">{bank.lastUpdated}</td>
+                  <td><Chip kind="ok" dot>Reporting</Chip></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </div>
+        <NetworkAvailabilitySummary data={network} />
+      </div>
+      <div className="consortium-disclosure"><I name="info" size={16} /><span>DOH access is read-only and intended for regulatory monitoring. Requests, stock allocation, and transfer decisions remain with authorized hospitals and PRC personnel.</span></div>
     </div>
   );
 }
