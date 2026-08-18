@@ -22,6 +22,7 @@ The prototype intentionally uses **no build step** — everything runs from stat
 | Fonts | Google Fonts: Newsreader (serif/display), Inter (sans/UI), JetBrains Mono (mono/data) | Loaded via `<link>` in `index.html` |
 | State | React hooks only (`useState`, `useEffect`, `useContext`) | No Redux/Zustand/Context library; one root `App` component owns navigation and session state |
 | Mock data | `data.js`, assigned onto `window` | Stand-in for the future REST/blockchain-backed API |
+| OCR | Tesseract.js 6.0.1 + English model | Pinned local browser assets; recognizes printed ISBT-128 donation serials without a cloud OCR call |
 | Icons | Hand-drawn inline SVG paths (`ICONS` map in `components.jsx`) | No icon package dependency |
 | Charts | Hand-rolled inline SVG (`Spark`, bar rows, heatmap cells, network topology map) | No charting library |
 
@@ -61,10 +62,11 @@ bloodledger-frontend/
 │   ├── inventory.jsx         # FEFO-sequenced unit list, surplus/expiry/cold-chain panels
 │   ├── transfers.jsx          # Active transfers table, transfer detail, BROA transfer wizard
 │   ├── alerts.jsx             # Alert center (critical/low-cover/informational)
-│   ├── scanner.jsx             # Scan & intake simulation, today's intake log
+│   ├── scanner.jsx             # Mobile OCR capture, inbound/outbound preview and transaction log
 │   ├── consortium.jsx          # Cross-hospital heatmap, network topology map, peer table
 │   ├── audit.jsx                # Immutable ledger / audit trail viewer
 │   └── reporting.jsx             # DOH/PRC read-only KPI and filings view
+├── vendor/ocr/             # Pinned Tesseract browser runtime, worker, core, and English model
 └── uploads/                # Reference materials only (e.g. manuscript PDF) — not app assets
 ```
 
@@ -83,7 +85,9 @@ No install step is required.
 2. Open the printed local URL in a browser.
 3. The app boots straight into the dashboard as **Dr. R. Reyes, Blood Bank Head, Mary Mediatrix Medical Center** (see `app.jsx`'s initial `session` state). Use the floating tweaks panel (bottom-right) → **Demo → Show login screen** to see the login page.
 
-No environment variables, `.env` files, or API keys are needed at this stage — there is no network call in the app beyond the CDN script tags and Google Fonts.
+The mobile scanner is available from **Blood Unit Transactions**. The desktop page is a transaction hub; **Open Mobile Scanner** opens the responsive phone simulation without changing the URL. Camera capture requires HTTPS on a phone, or `localhost` during development. **Try Demo Label** exercises the same local OCR worker without requesting camera permission.
+
+No environment variables, `.env` files, OCR API keys, or cloud recognition service are needed at this stage. The OCR runtime and English model are served from `vendor/ocr`; the remaining network-loaded assets are the existing UI libraries and Google Fonts.
 
 ## What this documentation set covers
 

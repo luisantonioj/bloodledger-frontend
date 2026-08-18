@@ -51,6 +51,9 @@ const ICONS = {
   scanner:
     "M4 7V5a1 1 0 0 1 1-1h2M20 7V5a1 1 0 0 0-1-1h-2M4 17v2a1 1 0 0 0 1 1h2M20 17v2a1 1 0 0 1-1 1h-2M7 8v8M11 8v8M15 8v8M18 8v8",
 
+  camera:
+    "M4 7h3l2-3h6l2 3h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Zm8 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z",
+
   audit:
     "M5 4h11l3 3v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm3 8h8M8 16h6M8 8h5",
 
@@ -264,7 +267,8 @@ function Btn({
   disabled,
   type,
   title,
-  ariaLabel
+  ariaLabel,
+  buttonRef
 }) {
   const cls =
     kind === "primary"
@@ -282,6 +286,7 @@ function Btn({
 
   return (
     <button
+      ref={buttonRef}
       className={`${cls} ${sz}`}
       onClick={onClick}
       disabled={disabled}

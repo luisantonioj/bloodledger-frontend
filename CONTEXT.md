@@ -33,7 +33,7 @@ Each page in the app corresponds to functionality the research proposal specifie
 | **Inventory** | FEFO-sequenced full unit list (ISBT-128 id, component, source, expiry countdown, cold-chain temp, shelf location), surplus/expiry/cold-chain side panels | FR-01, FR-02, FR-04 |
 | **Transfers** | Active/recent transfer table, transfer detail with multi-signature stepper, and the **BROA-guided transfer wizard** (Request → Source ranking → Validate → Confirm → Sign → Track) | FR-05, FR-06, FR-07, FR-11 |
 | **Alerts** | Critical/low-cover/informational alert center, each with a BROA recommendation and a one-click "Create transfer" action pre-filled into the wizard | FR-08, FR-09 |
-| **Scanner** | Simulated barcode/QR scan → decoded unit → commit-to-ledger flow; today's intake log | FR-01, FR-13 (offline buffering, simulated) |
+| **Scanner** | Mobile rear-camera or uploaded-photo OCR of the printed ISBT-128 donation serial → human review → inbound/outbound transaction record; offline entries are visibly buffered | FR-01, FR-13 |
 | **Consortium** | Cross-hospital inventory heatmap, network topology map (live vs. read-only links), peer/node health table | FR-03, stakeholder network |
 | **Audit** | Immutable, filterable ledger of every action (dispatch, receive, override, signature, sensor event) with hash/block/geo-signature detail | FR-10, FR-11, NFR-02 |
 | **Reporting** | Read-only KPI dashboard for DOH/PRC: consortium totals, distribution by chapter, completion rate by route, wastage, fulfillment time, donor consent compliance, ready-to-file DOH reports | Stakeholder read-only access, automated report generation objective |
@@ -53,11 +53,12 @@ BROA (Blood Recommendation & Optimization Agent, referred to in the UI copy) is 
 8. Wizard step **Track**: commit confirmation with tx ID, block number, hash, next steps.
 9. On commit, a toast confirms the ledger write; the new transfer appears at the top of Transfers and Dashboard's network activity table with status "Dispatched."
 
-### 2. Scanning a new unit into inventory
-1. Med Technologist opens Scanner, selects capture mode (ISBT / QR / Manual).
-2. Triggers a scan (simulated in the prototype) → decoded unit card appears with donor consent flag, source, expiry, intake temperature, auto-assigned shelf location.
-3. User reviews and either **Rejects**, **Re-scans**, or **Commits to ledger**.
-4. Committed unit appears at the top of "Today's intake" with a block number; it becomes discoverable in Inventory.
+### 2. Recording a blood-unit transaction
+1. An authorized user opens **Blood Unit Transactions** and launches its mobile scanner simulation. They select inbound or outbound; secondary requestors are restricted to inbound.
+2. The user opens the rear camera, uploads a label photo, or enters details manually. OCR reads the printed ISBT-128 donation serial; it does not scan a barcode or QR code.
+3. The recognized serial remains editable and is matched to the prototype unit catalog. Unknown serials continue to manual product-detail entry instead of silently inventing data.
+4. The user reviews blood type, component, dates, source/destination, purpose, and OCR confidence, then confirms through a modal.
+5. The app creates scan and transaction identifiers, records a truncated mock blockchain identifier while online, updates the relevant mock inventory state, and adds an Activity History entry. Offline records are marked **Buffered** for a future backend synchronization layer.
 
 ### 3. Investigating an audit event
 1. From any page that references a transaction (Transfer detail's "View on ledger," an alert's "View on ledger," a cold-chain resolution note), user lands on Audit with a pre-applied filter/search.

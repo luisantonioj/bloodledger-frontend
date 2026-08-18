@@ -970,6 +970,30 @@ window.CONSORTIUM_BANKS = [
   },
 ];
 
+// Reference records used by the mobile OCR demonstration. These represent
+// serialized units expected from an external consortium source and allow the
+// scanner to resolve a printed serial number without collecting donor data.
+window.OCR_UNIT_CATALOG = [
+  {
+    isbt: "=)W0381 2512 100118",
+    type: "B-",
+    comp: "PRBC",
+    collected: "2026-07-18",
+    expires: "2026-08-29",
+    status: "In Transit",
+    source: "PRC-LIP",
+  },
+  {
+    isbt: "=)W0381 2512 100119",
+    type: "O+",
+    comp: "Platelets",
+    collected: "2026-08-12",
+    expires: "2026-08-19",
+    status: "In Transit",
+    source: "MDH-LIP",
+  },
+];
+
 window.CONSORTIUM_COMPONENT_FACTORS = {
   PRBC: 1,
   Platelets: 0.32,

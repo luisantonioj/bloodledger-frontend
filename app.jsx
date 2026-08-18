@@ -458,10 +458,13 @@ function App() {
       const nextPermissions =
         buildPermissions(next);
 
-      setPage(
+      const nextPage =
         nextPermissions.canManageAccounts
           ? "accounts"
-          : "dashboard"
+          : "dashboard";
+
+      setPage(
+        nextPage
       );
 
       setPageState(null);
