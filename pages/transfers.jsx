@@ -148,13 +148,13 @@ function TransfersPage({
     }
   }, [prefill, canCreateRequest]);
 
-  const requests = scopedTransferList.filter((item) => {
-    return (
-      item.requestOnly ||
-      item.status === "Pending" ||
-      item.status === "Requested"
-    );
-  });
+  const requestRecords = scopedTransferList.filter((item) => item.requestOnly);
+
+  // Approved requests leave the decision queue. Their linked operational
+  // record is shown in Transfers, where preparation and custody scans occur.
+  const requests = requestRecords.filter(
+    (item) => !["Approved", "Cancelled After Approval"].includes(item.status)
+  );
 
   const activeTransfers = scopedTransferList.filter((item) => {
     return !item.requestOnly;
@@ -175,8 +175,26 @@ function TransfersPage({
     : null;
 
   const linkedRequest = selectedTransfer?.requestId
-    ? requests.find((item) => item.id === selectedTransfer.requestId) || null
+    ? requestRecords.find((item) => item.id === selectedTransfer.requestId) || null
     : null;
+
+  const recommendSupplier = (type, product) => {
+    const factor = (window.CONSORTIUM_COMPONENT_FACTORS || {})[product] || 1;
+    const ranked = (window.CONSORTIUM_BANKS || [])
+      .filter((bank) => bank.facilityId !== hospital?.id)
+      .map((bank) => {
+        const facility = hospitalById(bank.facilityId);
+        const stock = bank.inventory?.[type] || { available: 0 };
+        return {
+          id: bank.facilityId,
+          available: Math.max(0, Math.round((Number(stock.available) || 0) * factor)),
+          distance: Number(facility?.distance_km) || 999,
+        };
+      })
+      .sort((left, right) => right.available - left.available || left.distance - right.distance);
+
+    return ranked.find((item) => item.available > 0)?.id || ranked[0]?.id || null;
+  };
 
   const nowStamp = () =>
     new Date()
@@ -303,6 +321,8 @@ function TransfersPage({
 
       onUpdateTransfers([transfer, ...updated]);
       setSelectedId(transfer.id);
+      setSelectedRequestId(null);
+      setActiveTab("transfers");
 
       toast.push({
         kind: "ok",
@@ -408,12 +428,25 @@ function TransfersPage({
       return;
     }
 
+    const assignedSupplierId = permissions.secondary
+      ? recommendSupplier(bloodType, component)
+      : supplierId;
+
+    if (!assignedSupplierId) {
+      toast.push({
+        kind: "warn",
+        text: "No eligible blood bank found",
+        sub: "The request cannot be routed until a participating blood bank reports availability.",
+      });
+      return;
+    }
+
     const payload = {
       type: bloodType,
       component,
       units: Number(units),
       urgency,
-      from: supplierId,
+      from: assignedSupplierId,
       to: hospital?.id,
       requestOnly: true,
       note,
@@ -971,15 +1004,25 @@ function TransfersPage({
                   <span style={helperStyle}>Select the required blood product.</span>
                 </div>
 
-                <div style={fieldGroupStyle}>
-                  <label style={labelStyle}>Supplying Blood Bank</label>
-                  <select value={supplierId} onChange={(event) => setSupplierId(event.target.value)} style={inputStyle}>
-                    {consortiumBanks
-                      .filter((bank) => bank?.id !== hospital?.id)
-                      .map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
-                  </select>
-                  <span style={helperStyle}>The selected Blood Bank Head will review this request.</span>
-                </div>
+                {permissions.secondary ? (
+                  <div style={fieldGroupStyle}>
+                    <label style={labelStyle}>Supplier Routing</label>
+                    <div className="request-routing-summary">
+                      <I name="link" size={16} />
+                      <span><strong>Assigned automatically</strong><small>BloodLedger will recommend the best eligible blood bank after submission.</small></span>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={fieldGroupStyle}>
+                    <label style={labelStyle}>Supplying Blood Bank</label>
+                    <select value={supplierId} onChange={(event) => setSupplierId(event.target.value)} style={inputStyle}>
+                      {consortiumBanks
+                        .filter((bank) => bank?.id !== hospital?.id)
+                        .map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
+                    </select>
+                    <span style={helperStyle}>The selected Blood Bank Head will review this request.</span>
+                  </div>
+                )}
 
                 {/* Units */}
                 <div style={fieldGroupStyle}>

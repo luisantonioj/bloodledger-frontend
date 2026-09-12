@@ -9,8 +9,10 @@
 // after stakeholder validation.
 
 function AlertsPage({ hospital, permissions, onAct, onNav, alerts: alertRows }) {
-  const alerts = (alertRows || window.ALERTS || []).filter(
-    (alert) => !alert.hospitalId || alert.hospitalId === hospital?.id
+  const alerts = visibleAlertsForRole(
+    alertRows || window.ALERTS || [],
+    hospital,
+    permissions
   );
   const toast = React.useContext(ToastCtx);
 
@@ -38,7 +40,15 @@ function AlertsPage({ hospital, permissions, onAct, onNav, alerts: alertRows }) 
       <PageHead
         eyebrow="BloodLedger"
         title="Alerts"
-        sub="View important inventory and system notifications."
+        sub={
+          permissions?.roleKey === "prc_admin"
+            ? "Monitor blood-bank shortages that may require PRC replenishment."
+            : permissions?.roleKey === "regulator"
+            ? "Review late, missing, and due blood-bank compliance submissions."
+            : permissions?.requester
+            ? "Track request decisions, transfer movement, and actions required by your facility."
+            : "View important inventory and system notifications."
+        }
       />
 
       {/* Summary */}
@@ -316,13 +326,9 @@ function AlertsPage({ hospital, permissions, onAct, onNav, alerts: alertRows }) 
               </div>
 
               <div className="muted tiny">
-                Alert types,
-                notification thresholds,
-                escalation procedures, and
-                required user actions are
-                placeholders and may change
-                after consultation with
-                hospital stakeholders.
+                Alerts are filtered for this role. PRC administrators see
+                blood-bank supply shortages, requestors see request and receipt
+                updates, and blood-bank users see local inventory conditions.
               </div>
             </div>
           </div>

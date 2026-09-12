@@ -252,6 +252,35 @@ function ScannerPage({
   };
 
   const buildManualPreview = () => {
+    if (direction === "Outbound") {
+      const registeredUnit = scanInventory.find(
+        (unit) => compactSerial(unit.isbt) === compactSerial(form.isbt)
+      );
+      const linkedTransfer = (window.TRANSFERS || []).find(
+        (item) =>
+          item.from === hospital?.id &&
+          item.status === "Approved" &&
+          (!registeredUnit?.type || item.type === registeredUnit.type)
+      );
+      const destination = hospitalById(linkedTransfer?.to);
+
+      return {
+        direction,
+        method: "Manual Serial",
+        isbt: registeredUnit?.isbt || form.isbt.trim(),
+        type: registeredUnit?.type || "O+",
+        comp: registeredUnit?.comp || "PRBC",
+        collected: registeredUnit?.collected || "",
+        expires: registeredUnit?.expires || "",
+        facilityId: destination?.id || "",
+        facilityName: destination?.name || "Approved requestor (simulation)",
+        purpose: linkedTransfer
+          ? `Approved transfer ${linkedTransfer.id}`
+          : "Approved blood transfer",
+        status: "Ready to release",
+      };
+    }
+
     const facility = otherFacilities.find(
       (item) => item.id === form.facilityId
     );
@@ -508,18 +537,23 @@ function ScannerPage({
   };
 
   const previewManual = () => {
-    if (!form.isbt.trim() || !form.expires) {
+    if (!form.isbt.trim() || (direction === "Inbound" && !form.expires)) {
       toast.push({
         kind: "warn",
         text: "Complete the required fields",
-        sub: "Unit ID and expiration date are required before previewing.",
+        sub:
+          direction === "Outbound"
+            ? "Enter the blood unit serial number before previewing."
+            : "Unit ID and expiration date are required before previewing.",
       });
       return;
     }
 
     if (
       direction === "Outbound" &&
-      !scanInventory.some((unit) => unit.isbt === form.isbt.trim())
+      !scanInventory.some(
+        (unit) => compactSerial(unit.isbt) === compactSerial(form.isbt)
+      )
     ) {
       toast.push({
         kind: "warn",
@@ -939,10 +973,30 @@ function ScannerPage({
             ) : (
               <div>
                 <div className="muted small" style={{ marginBottom: 16 }}>
-                  Enter the basic {direction.toLowerCase()} transaction details.
-                  Unit ID and expiration date are required.
+                  {direction === "Outbound"
+                    ? "Enter only the printed blood unit serial number. Product and transfer details are resolved from local inventory for this simulation."
+                    : "Enter the basic inbound transaction details. Unit ID and expiration date are required."}
                 </div>
 
+                {direction === "Outbound" ? (
+                  <div className="outbound-serial-only">
+                    <div className="outbound-serial-heading">
+                      <div><span className="page-eyebrow">Manual outbound simulation</span><h4>Scan or enter one serial number</h4></div>
+                      <Chip kind="warn" dot>Outbound</Chip>
+                    </div>
+                    <label>
+                      <span>Printed Blood Unit Serial Number</span>
+                      <input
+                        className="input mono"
+                        value={form.isbt}
+                        placeholder="e.g. =)W0381 2509 100023"
+                        onChange={(event) => updateForm("isbt", event.target.value)}
+                        autoFocus
+                      />
+                    </label>
+                    <div className="outbound-serial-note"><I name="info" size={14} /> Blood type, component, expiration, and destination are retrieved from the registered unit and its approved transfer.</div>
+                  </div>
+                ) : (
                 <dl className="kv">
                   <dt>Unit ID</dt>
                   <dd>
@@ -1048,6 +1102,7 @@ function ScannerPage({
                     />
                   </dd>
                 </dl>
+                )}
 
                 <div className="row" style={{ marginTop: 18 }}>
                   <Btn kind="primary" icon="check" onClick={previewManual}>

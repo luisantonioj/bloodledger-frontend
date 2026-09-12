@@ -459,7 +459,8 @@ function App() {
         buildPermissions(next);
 
       const nextPage =
-        nextPermissions.canManageAccounts
+        nextPermissions.canManageAccounts &&
+        !nextPermissions.canViewDashboard
           ? "accounts"
           : "dashboard";
 
@@ -764,19 +765,11 @@ function App() {
       ).length,
 
     alerts:
-      (
-        alerts
-      ).filter(
-        (
-          alert
-        ) =>
-          (
-            !alert.hospitalId ||
-            alert.hospitalId === session.hospital?.id
-          ) &&
-          alert.severity ===
-          "critical"
-      ).length,
+      visibleAlertsForRole(
+        alerts,
+        session.hospital,
+        permissions
+      ).filter((alert) => alert.severity === "critical").length,
 
     accounts:
       (

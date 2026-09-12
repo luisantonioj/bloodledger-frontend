@@ -6,7 +6,7 @@ The current codebase is a **high-fidelity mock/prototype**, not yet wired to any
 
 ## What BloodLedger is
 
-A permissioned consortium blockchain (Hyperledger Fabric) synchronizes blood inventory across Mary Mediatrix Medical Center (the sole primary blockchain node for this deployment phase), the Philippine Red Cross Lipa Chapter, other Lipa City hospitals (secondary/read-only nodes), and DOH-CHD Calabarzon (regulator, read-only). Barcode/QR IoT scanning removes manual data entry, a Blood Redistribution Optimization Algorithm (BROA) combines FEFO unit sequencing with Simple Additive Weighting across urgency/shortage/surplus/distance to recommend inter-hospital transfers, and a machine learning demand-forecasting microservice predicts daily consumption to compute a Predicted Distributable Surplus. This frontend is the console that Medical Technologists, Blood Bank Heads, PRC officers, and DOH regulators use to see and act on all of that.
+A permissioned consortium blockchain (Hyperledger Fabric) synchronizes blood inventory across Mary Mediatrix Medical Center (the sole primary blockchain node for this deployment phase), the Philippine Red Cross Lipa Chapter, other Lipa City hospitals (secondary/read-only nodes), and DOH-CHD Calabarzon (regulator, read-only). Barcode/QR IoT scanning removes manual data entry, a Blood Redistribution Optimization Algorithm (BROA) combines FEFO unit sequencing with Simple Additive Weighting across urgency/shortage/surplus/distance to recommend inter-hospital transfers, and a machine learning demand-forecasting microservice predicts daily consumption to compute a Predicted Distributable Surplus. This frontend is the role-based console used by Medical Technologists, Blood Bank Heads, the PRC Administrator, requestors, and DOH regulators.
 
 See `context.md` for target users, features, and flows; `design.md` for the visual system; `agents.md` for coding rules; `tasks.md` for the build plan.
 
@@ -65,7 +65,7 @@ bloodledger-frontend/
 │   ├── scanner.jsx             # Mobile OCR capture, inbound/outbound preview and transaction log
 │   ├── consortium.jsx          # Cross-hospital heatmap, network topology map, peer table
 │   ├── audit.jsx                # Immutable ledger / audit trail viewer
-│   └── reporting.jsx             # DOH/PRC read-only KPI and filings view
+│   └── reporting.jsx             # Blood-bank checkpoint capture and compliance records
 ├── vendor/ocr/             # Pinned Tesseract browser runtime, worker, core, and English model
 └── uploads/                # Reference materials only (e.g. manuscript PDF) — not app assets
 ```

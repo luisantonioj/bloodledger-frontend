@@ -30,8 +30,10 @@ function DashboardPage({ hospital, permissions, transfers, onNav, onAct }) {
         };
       })
     : window.MATRIX || [];
-  const alerts = (window.ALERTS || []).filter(
-    (alert) => !alert.hospitalId || alert.hospitalId === hospital?.id
+  const alerts = visibleAlertsForRole(
+    window.ALERTS || [],
+    hospital,
+    permissions
   );
   const allTransferData = transfers || window.TRANSFERS || [];
   const transferData = permissions?.bloodBank || permissions?.secondary
@@ -48,7 +50,7 @@ function DashboardPage({ hospital, permissions, transfers, onNav, onAct }) {
     );
   }
 
-  if (permissions?.roleKey === "prc") {
+  if (["prc", "prc_admin"].includes(permissions?.roleKey)) {
     return <PrcDashboard hospital={hospital} onNav={onNav} />;
   }
 
@@ -440,12 +442,14 @@ function DashboardPage({ hospital, permissions, transfers, onNav, onAct }) {
 function RequestorDashboard({ hospital, transfers, onNav }) {
   const [networkType, setNetworkType] = React.useState("O+");
   const [networkComponent, setNetworkComponent] = React.useState("PRBC");
-  const requests = transfers.filter(
+  const scopedRecords = transfers.filter(
     (item) => item.to === hospital?.id || item.from === hospital?.id
   );
+  const requests = scopedRecords.filter((item) => item.requestOnly);
+  const operationalTransfers = scopedRecords.filter((item) => !item.requestOnly);
   const requested = requests.filter((item) => ["Pending", "Requested"].includes(item.status)).length;
-  const inTransit = requests.filter((item) => ["Approved", "Dispatched", "In Transit"].includes(item.status)).length;
-  const received = requests.filter((item) => ["Received", "Completed"].includes(item.status)).length;
+  const inTransit = operationalTransfers.filter((item) => ["Approved", "Dispatched", "In Transit"].includes(item.status)).length;
+  const received = operationalTransfers.filter((item) => ["Received", "Completed"].includes(item.status)).length;
   const recent = requests.slice(0, 6);
   const componentFactor = (window.CONSORTIUM_COMPONENT_FACTORS || {})[networkComponent] || 1;
   const networkBanks = (window.CONSORTIUM_BANKS || []).map((bank) => {
@@ -456,6 +460,10 @@ function RequestorDashboard({ hospital, transfers, onNav }) {
       available: Math.max(0, Math.round(source.available * componentFactor)),
     };
   }).sort((a, b) => b.available - a.available || a.facility.distance_km - b.facility.distance_km);
+  const networkAvailable = networkBanks.reduce(
+    (sum, bank) => sum + bank.available,
+    0
+  );
 
   return (
     <div className="page">
@@ -498,23 +506,22 @@ function RequestorDashboard({ hospital, transfers, onNav }) {
         <div className="card requestor-network-card">
           <div className="card-h">
             <div><h3>Network Blood Availability</h3><div className="sub muted">Redistributable supply from all participating blood banks.</div></div>
+            <Btn size="sm" kind="primary" icon="plus" onClick={() => onNav("transfers", { type: networkType, component: networkComponent })}>Request Blood</Btn>
           </div>
           <div className="card-b">
             <div className="requestor-network-filters">
               <label><span>Blood Type</span><select value={networkType} onChange={(event) => setNetworkType(event.target.value)}>{(window.BLOOD_TYPES || []).map((type) => <option key={type}>{type}</option>)}</select></label>
               <label><span>Component</span><select value={networkComponent} onChange={(event) => setNetworkComponent(event.target.value)}>{(window.COMPONENTS || []).map((item) => <option key={item}>{item}</option>)}</select></label>
             </div>
-            <div className="requestor-supplier-list">
-              {networkBanks.map((bank) => (
-                <div key={bank.facilityId}>
-                  <span className="peer-dot" />
-                  <div><strong>{bank.facility.short}</strong><small>{bank.facility.distance_km.toFixed(1)} km · updated {bank.lastUpdated.slice(11)}</small></div>
-                  <div className="requestor-supplier-quantity"><strong>{bank.available}</strong><span>available</span></div>
-                  <Btn size="sm" kind={bank.available ? "ghost" : "default"} disabled={!bank.available} onClick={() => onNav("transfers", { type: networkType, component: networkComponent, supplierId: bank.facilityId })}>Request</Btn>
-                </div>
-              ))}
+            <div className={`requestor-availability-result ${networkAvailable ? "available" : "unavailable"}`}>
+              <div className="requestor-availability-blood"><BloodType type={networkType} lg /><span>{networkComponent}</span></div>
+              <div className="requestor-availability-quantity"><strong className="mono">{networkAvailable}</strong><span>network units available</span></div>
+              <div className="requestor-availability-status">
+                <Chip kind={networkAvailable ? "ok" : "critical"} dot>{networkAvailable ? "Request available" : "No current supply"}</Chip>
+                <small>{networkAvailable ? "A source will be selected after submission." : "You may still submit an urgent request for review."}</small>
+              </div>
             </div>
-            <div className="requestor-network-note"><I name="info" size={14} /> Quantities exclude reserved and safety-stock units and remain subject to supplier approval.</div>
+            <div className="requestor-network-note"><I name="info" size={14} /> Individual hospital eligibility is intentionally hidden. Submit one request and BloodLedger will route it using availability, distance, and redistribution rules.</div>
           </div>
         </div>
       </div>
@@ -579,13 +586,31 @@ function PrcDashboard({ hospital, onNav }) {
   const network = consortiumDashboardData();
   const supplyRequests = window.PRC_SUPPLY_REQUESTS || [];
   const openSupply = supplyRequests.filter((item) => !["Completed", "Cancelled"].includes(item.status)).length;
+  const chartTypes = (window.BLOOD_TYPES || []).map((type) => ({
+    type,
+    banks: network.banks.map((bank) => ({
+      facilityId: bank.facilityId,
+      name: bank.facility?.short || bank.facilityId,
+      units: Number(bank.inventory?.[type]?.total) || 0,
+      available: Number(bank.inventory?.[type]?.available) || 0,
+    })),
+  }));
+  const highest = Math.max(
+    1,
+    ...chartTypes.flatMap((item) => item.banks.map((bank) => bank.units))
+  );
+  const maximum = Math.ceil(highest / 5) * 5;
+  const ticks = Array.from({ length: 6 }, (_, index) =>
+    Math.round(maximum - (maximum / 5) * index)
+  );
 
   return (
     <div className="page">
       <PageHead
         eyebrow={hospital?.short || "Philippine Red Cross"}
-        title="PRC Supply Coordination"
-        sub="Monitor consortium shortages and coordinate replenishment with participating blood banks."
+        title="PRC Administrator Dashboard"
+        sub="Monitor blood-bank supply levels, coordinate replenishment, and administer consortium participation."
+        actions={<Btn size="sm" kind="ghost" onClick={() => onNav("accounts")}>Manage accounts <I name="arrowRight" size={12} /></Btn>}
       />
       <div className="stat-grid">
         <Stat label="Participating Blood Banks" value={network.banks.length} unit="facilities" />
@@ -594,28 +619,48 @@ function PrcDashboard({ hospital, onNav }) {
         <Stat label="Open Supply Requests" value={openSupply} unit="requests" accent={openSupply ? "info" : undefined} />
       </div>
       <div style={{ height: 18 }} />
-      <div className="grid-dash role-dashboard-grid">
-        <NetworkAvailabilitySummary data={network} />
-        <div className="card">
-          <div className="card-h">
-            <div><h3>Blood-Bank Reporting Status</h3><div className="sub muted">Latest stock update received from each consortium member.</div></div>
+      <div className="card">
+        <div className="card-h">
+          <div><h3>Blood-Bank Inventory Overview</h3><div className="sub muted">Total PRBC stock by blood type for every participating blood bank.</div></div>
+          <Btn size="sm" kind="ghost" onClick={() => onNav("alerts")}>View shortage alerts <I name="arrowRight" size={12} /></Btn>
+        </div>
+        <div className="card-b inventory-chart-scroll">
+          <div className="prc-bank-legend" aria-label="Blood bank chart legend">
+            {network.banks.map((bank, index) => <span key={bank.facilityId}><i className={`bank-${index + 1}`} />{bank.facility?.name}</span>)}
           </div>
-          <div className="card-b flush">
-            <table className="tbl">
-              <thead><tr><th>Blood Bank</th><th>Updated</th><th className="right">Available</th><th>Status</th></tr></thead>
-              <tbody>{network.banks.map((bank) => (
-                <tr key={bank.facilityId}>
-                  <td><strong>{bank.facility.short}</strong></td>
-                  <td className="mono tiny">{bank.lastUpdated}</td>
-                  <td className="right mono">{bank.available}</td>
-                  <td><Chip kind="ok" dot>{bank.status}</Chip></td>
-                </tr>
-              ))}</tbody>
-            </table>
+          <div className="inventory-chart prc-inventory-chart" aria-label="PRC blood-bank supply bar chart">
+            <div className="inventory-chart-y-title">Total units</div>
+            <div className="inventory-chart-y-axis" aria-hidden="true">
+              {ticks.map((tick) => <span key={tick} className="mono tiny">{tick}</span>)}
+            </div>
+            <div className="inventory-chart-plot">
+              <div className="inventory-chart-grid" aria-hidden="true">{ticks.map((tick) => <span key={tick} />)}</div>
+              <div className="inventory-chart-bars">
+                {chartTypes.map((item) => {
+                  const total = item.banks.reduce((sum, bank) => sum + bank.units, 0);
+                  return <div key={item.type} className="inventory-bar prc-inventory-group">
+                    <span className="inventory-bar-track">
+                      <span className="prc-bank-bars">
+                        {item.banks.map((bank, index) => {
+                          const height = `${Math.max(3, (bank.units / maximum) * 100)}%`;
+                          return <span key={bank.facilityId} className={`prc-bank-bar bank-${index + 1}`} style={{ height }} title={`${bank.name} · ${item.type} · ${bank.units} total · ${bank.available} redistributable`}><b className="mono">{bank.units}</b></span>;
+                        })}
+                      </span>
+                    </span>
+                    <span className="inventory-bar-label"><span>{item.type}</span><small>{total} across network</small></span>
+                  </div>;
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </div>
       <div style={{ height: 18 }} />
+      <div className="grid-dash role-dashboard-grid">
+      <div className="card">
+        <div className="card-h"><div><h3>Blood-Bank Reporting Status</h3><div className="sub muted">Latest stock update received from each member blood bank.</div></div></div>
+        <div className="card-b flush"><table className="tbl"><thead><tr><th>Blood Bank</th><th>Updated</th><th className="right">Available</th><th>Status</th></tr></thead><tbody>{network.banks.map((bank) => <tr key={bank.facilityId}><td><strong>{bank.facility.short}</strong></td><td className="mono tiny">{bank.lastUpdated}</td><td className="right mono">{bank.available}</td><td><Chip kind="ok" dot>{bank.status}</Chip></td></tr>)}</tbody></table></div>
+      </div>
       <div className="card">
         <div className="card-h">
           <div><h3>Hospital Replenishment Requests</h3><div className="sub muted">Requests sent to PRC for blood-bank stock replenishment.</div></div>
@@ -636,51 +681,69 @@ function PrcDashboard({ hospital, onNav }) {
           </table>
         </div>
       </div>
+      </div>
     </div>
   );
 }
 
 function RegulatoryDashboard({ hospital, onNav }) {
-  const network = consortiumDashboardData();
+  const rows = window.COMPLIANCE_STATUS || [];
+  const compliant = rows.filter((item) => item.status === "Compliant").length;
+  const due = rows.filter((item) => item.status === "Due Today").length;
+  const late = rows.filter((item) => item.status === "Late Submission").length;
+  const regulatoryAlerts = rows.filter((item) => item.status !== "Compliant").map((item) => ({
+    id: `DOH-${item.facilityId}`,
+    facility: hospitalById(item.facilityId),
+    severity: item.status === "Late Submission" ? "critical" : "warn",
+    title: item.status === "Late Submission" ? "Late compliance submission" : "Reporting checkpoint due",
+    desc: item.status === "Late Submission"
+      ? `${hospitalById(item.facilityId)?.name} submitted a required checkpoint after the reporting window.`
+      : `${hospitalById(item.facilityId)?.name} has not yet submitted the afternoon checkpoint.`,
+  }));
 
   return (
     <div className="page">
       <PageHead
         eyebrow={hospital?.short || "DOH CALABARZON"}
-        title="Regulatory Oversight Dashboard"
-        sub="Read-only oversight of consortium participation, reporting activity, and blood availability."
-        actions={<Btn size="sm" kind="ghost" onClick={() => onNav("reporting")}>View compliance reports <I name="arrowRight" size={12} /></Btn>}
+        title="Compliance Oversight Dashboard"
+        sub="A single read-only view of blood-bank reporting compliance and regulatory alerts."
       />
       <div className="stat-grid">
-        <Stat label="Registered Blood Banks" value={network.banks.length} unit="facilities" />
-        <Stat label="Facilities Reporting" value={network.banks.filter((bank) => bank.status === "Online").length} unit={`of ${network.banks.length}`} accent="ok" />
-        <Stat label="Network Stock" value={network.total} unit="units" />
-        <Stat label="Redistributable Supply" value={network.available} unit="units" accent="info" />
+        <Stat label="Monitored Blood Banks" value={rows.length} unit="facilities" />
+        <Stat label="Fully Compliant" value={compliant} unit={`of ${rows.length}`} accent="ok" />
+        <Stat label="Reports Due" value={due} unit="facilities" accent={due ? "warn" : undefined} />
+        <Stat label="Late Submissions" value={late} unit="facilities" accent={late ? "critical" : undefined} />
       </div>
       <div style={{ height: 18 }} />
       <div className="grid-dash role-dashboard-grid">
         <div className="card">
           <div className="card-h">
-            <div><h3>Consortium Facility Overview</h3><div className="sub muted">High-level reporting status; operational unit-level data remains with each blood bank.</div></div>
+            <div><h3>Compliance Reports</h3><div className="sub muted">Morning and afternoon reporting checkpoints by licensed blood bank.</div></div>
+            <Btn size="sm" kind="ghost" onClick={() => onNav("reporting")}>View all reports <I name="arrowRight" size={12} /></Btn>
           </div>
           <div className="card-b flush">
             <table className="tbl">
-              <thead><tr><th>Licensed Facility</th><th className="right">On Hand</th><th className="right">Redistributable</th><th>Last Report</th><th>Status</th></tr></thead>
-              <tbody>{network.banks.map((bank) => (
-                <tr key={bank.facilityId}>
-                  <td><strong>{bank.facility.name}</strong><div className="tiny muted">{bank.facility.type}</div></td>
-                  <td className="right mono">{bank.total}</td>
-                  <td className="right mono">{bank.available}</td>
-                  <td className="mono tiny">{bank.lastUpdated}</td>
-                  <td><Chip kind="ok" dot>Reporting</Chip></td>
+              <thead><tr><th>Licensed Facility</th><th>9:00 AM</th><th>4:00 PM</th><th>Last Submission</th><th>Status</th></tr></thead>
+              <tbody>{rows.map((item) => (
+                <tr key={item.facilityId}>
+                  <td><strong>{hospitalById(item.facilityId)?.name}</strong><div className="tiny muted">{item.facilityId}</div></td>
+                  <td><Chip kind={item.morning === "Submitted" ? "ok" : "warn"}>{item.morning}</Chip></td>
+                  <td><Chip kind={item.afternoon === "Submitted" ? "ok" : "warn"}>{item.afternoon}</Chip></td>
+                  <td className="mono tiny">{item.lastSubmission}</td>
+                  <td><Chip kind={item.status === "Compliant" ? "ok" : item.status === "Late Submission" ? "critical" : "warn"} dot>{item.status}</Chip></td>
                 </tr>
               ))}</tbody>
             </table>
           </div>
         </div>
-        <NetworkAvailabilitySummary data={network} />
+        <div className="card">
+          <div className="card-h"><div><h3>Alerts</h3><div className="sub muted">Compliance exceptions requiring follow-up by DOH reviewers.</div></div><Btn size="sm" kind="ghost" onClick={() => onNav("alerts")}>View all alerts <I name="arrowRight" size={12} /></Btn></div>
+          <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {regulatoryAlerts.length ? regulatoryAlerts.map((alert) => <div key={alert.id} className={`alert-card ${alert.severity}`}><div><div className="row" style={{ gap: 8 }}><Chip kind={alert.severity === "critical" ? "critical" : "warn"}>{alert.severity.toUpperCase()}</Chip><div className="title">{alert.title}</div></div><div className="desc">{alert.desc}</div><div className="muted tiny" style={{ marginTop: 8 }}>Source: Compliance Monitor</div></div></div>) : <div className="muted small">No compliance exceptions require follow-up.</div>}
+          </div>
+        </div>
       </div>
-      <div className="consortium-disclosure"><I name="info" size={16} /><span>DOH access is read-only and intended for regulatory monitoring. Requests, stock allocation, and transfer decisions remain with authorized hospitals and PRC personnel.</span></div>
+      <div className="consortium-disclosure"><I name="info" size={16} /><span>DOH access is read-only. Operational inventory, requests, transfers, scanning, and account administration are intentionally hidden from this role.</span></div>
     </div>
   );
 }

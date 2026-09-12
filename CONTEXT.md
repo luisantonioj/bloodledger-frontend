@@ -16,8 +16,8 @@ The proposal defines a tiered stakeholder network. The frontend must serve all f
 |---|---|---|---|
 | **Medical Technologist** | Mary Mediatrix Medical Center (primary node) | Scan units in, initiate/dispatch/receive transfers, see the live matrix and alerts | Full operational access at their node |
 | **Blood Bank Head** | Mary Mediatrix Medical Center (primary node) | Everything a Med Technologist can do, plus approve/override/reconcile transfers, sign off with a PIN | Full operational + approval access |
-| **PRC Officer** | Philippine Red Cross Lipa Chapter (regulatory/hub node) | Hub-level distribution visibility, city-wide post-dispatch tracking | Full blockchain node; read-only city-wide view after dispatch |
-| **Regulator (DOH)** | DOH-CHD Calabarzon | City-wide audit trail, aggregated reporting/KPIs for compliance filings | Read-only dashboard, reporting, and audit access; no write actions anywhere |
+| **PRC Administrator** | Philippine Red Cross Lipa Chapter (system administrator and supply hub) | Review institutional applications, manage accounts, monitor blood-bank shortages, and coordinate replenishment | Consortium administration plus read-only supply coordination |
+| **Regulator (DOH)** | DOH-CHD Calabarzon | See which blood banks met required reporting checkpoints and review compliance exceptions | Read-only Dashboard, Alerts, and Compliance Reports; no operational inventory or write actions |
 | *(Participating blood banks — Lipa Medix Medical Center and N.L. Villa Memorial Medical Center)* | Consortium blood-bank institutions | Share approved stock availability, authorize requests, and track transfers | Access depends on the assigned institutional role |
 | *(Secondary requestors — Metro Lipa Medical Center and other approved facilities)* | Recipient institutions without a consortium blood bank | View redistributable availability, submit requests, and track receipt | Dashboard summary and request workflow; no inventory-write access |
 
@@ -38,7 +38,7 @@ Each page in the app corresponds to functionality the research proposal specifie
 | **Audit** | Immutable, filterable ledger of every action (dispatch, receive, override, signature, sensor event) with hash/block/geo-signature detail | FR-10, FR-11, NFR-02 |
 | **Reporting** | Read-only KPI dashboard for DOH/PRC: consortium totals, distribution by chapter, completion rate by route, wastage, fulfillment time, donor consent compliance, ready-to-file DOH reports | Stakeholder read-only access, automated report generation objective |
 
-BROA (Blood Recommendation & Optimization Agent, referred to in the UI copy) is the throughline across Dashboard, Alerts, and Transfers: it is what ranks candidate source hospitals by stock, distance, expiry/FEFO score, and produces the score shown as "BROA score" throughout. The frontend's job is to *display* BROA's output and let a human commit to it — not to compute it (that's the smart-contract/chaincode layer).
+BROA (Blood Recommendation & Optimization Agent, referred to in the UI copy) is the throughline across Dashboard, Alerts, and Transfers: it ranks candidate source hospitals by stock, distance, expiry/FEFO score, and produces the score shown as "BROA score" throughout. Requestors submit one request without choosing a hospital; the prototype assigns the strongest eligible source from current redistributable availability. The production recommendation remains a backend/chaincode responsibility.
 
 ## Key user flows
 
@@ -65,9 +65,10 @@ BROA (Blood Recommendation & Optimization Agent, referred to in the UI copy) is 
 2. User selects a row to see full transaction detail: hash, block, actor, role, action, target, endorsers, channel, chaincode version, and geo-signature (lat/long, accuracy, attesting gateway).
 3. User can jump back to the related transfer via "View transfer."
 
-### 4. Regulatory/oversight review (DOH, PRC)
-1. Read-only user opens Consortium to see the cross-hospital heatmap and network topology, or Reporting for aggregated KPIs.
-2. No write actions are available anywhere in this flow — no "New transfer," no scan, no commit buttons should ever render for a read-only role (see `agents.md` for how role-gating should be implemented once real auth exists; the current prototype does not yet gate UI by role).
+### 4. Regulatory and PRC administration review
+1. A PRC Administrator opens the supply dashboard for a blood-type bar chart, shortage alerts, replenishment records, and account administration.
+2. A DOH regulator opens a dashboard containing only compliance-report and alert summaries, with dedicated Alerts and Compliance Reports tabs for full review.
+3. No operational write actions are available in either oversight flow; only PRC account and institutional-application administration is actionable.
 
 ### 5. Signing in
 1. User selects their hospital chapter and role on the login screen, enters username/PIN.

@@ -17,7 +17,7 @@ function AccountsPage({ hospital, session, permissions, accountApplications, onU
   }
 
   const pending = applications.filter((item) => item.status === "Pending Review");
-  const activeInstitutions = institutions.filter((item) => !["DOH-CHD"].includes(item.id));
+  const activeInstitutions = institutions.filter((item) => !["PRC-LIP", "DOH-CHD"].includes(item.id));
   const normalizedSearch = search.trim().toLowerCase();
   const filteredAccounts = accounts.filter((account) => {
     const institution = institutions.find((item) => item.id === account.hospital);
@@ -54,6 +54,7 @@ function AccountsPage({ hospital, session, permissions, accountApplications, onU
         name: decision.institution_name,
         short: decision.institution_name,
         type: decision.applicant_type === "Blood Bank" ? "Consortium Blood Bank" : "Requestor Hospital",
+        is_blood_bank: decision.applicant_type === "Blood Bank",
         distance_km: null,
         peer_id: `pending.${assignedHospital.toLowerCase()}.bloodledger`,
         membership_status: "Active",
@@ -169,7 +170,7 @@ function ApplicationsTable({ applications, institutions, onReview }) {
 }
 
 function InstitutionsTable({ institutions, accounts }) {
-  return <div className="card"><div className="card-h"><div><h3>Consortium Institutions</h3><div className="sub muted">Approved facilities and their current BloodLedger membership.</div></div></div><div className="card-b flush"><table className="tbl"><thead><tr><th>Institution</th><th>Participation Type</th><th>Peer / Provisioning ID</th><th>Authorized Users</th><th>Status</th></tr></thead><tbody>{institutions.map((item) => <tr key={item.id}><td><strong>{item.name}</strong><div className="mono tiny muted">{item.id}</div></td><td>{item.type}</td><td className="mono tiny">{item.peer_id}</td><td className="tnum">{accounts.filter((account) => account.hospital === item.id).length}</td><td><Chip kind="ok" dot>{item.membership_status || "Active"}</Chip></td></tr>)}</tbody></table></div></div>;
+  return <div className="card"><div className="card-h"><div><h3>Consortium Institutions</h3><div className="sub muted">Approved BloodBank and Requestor institutions in BloodLedger.</div></div></div><div className="card-b flush"><table className="tbl"><thead><tr><th>Institution</th><th>Role</th><th>Peer / Provisioning ID</th><th>Authorized Users</th><th>Status</th></tr></thead><tbody>{institutions.map((item) => <tr key={item.id}><td><strong>{item.name}</strong><div className="mono tiny muted">{item.id}</div></td><td><Chip kind={item.is_blood_bank ? "info" : "neutral"}>{item.is_blood_bank ? "BloodBank" : "Requestor"}</Chip></td><td className="mono tiny">{item.peer_id}</td><td className="tnum">{accounts.filter((account) => account.hospital === item.id).length}</td><td><Chip kind="ok" dot>{item.membership_status || "Active"}</Chip></td></tr>)}</tbody></table></div></div>;
 }
 
 function AccountsTable({ accounts, institutions, search, setSearch, currentEmail, onDelete }) {

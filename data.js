@@ -95,15 +95,9 @@ window.INSTITUTION_ROLES = {
 
   "PRC-LIP": [
     {
-      id: "PRC Officer",
-      label: "PRC Officer",
-      sub: "Review blood availability and coordinate distribution activities.",
-    },
-
-    {
       id: "PRC Administrator",
       label: "PRC Administrator",
-      sub: "Oversee PRC-side BloodLedger activities and records.",
+      sub: "Administer consortium access and coordinate blood-bank replenishment.",
     },
   ],
 
@@ -697,6 +691,110 @@ window.TRANSFERS = [
 
 window.ALERTS = [
   {
+    id: "AL-DOH-3102",
+    audience: "regulator",
+    severity: "critical",
+    title: "Late compliance submission — N.L. Villa",
+    desc: "The morning blood-stock checkpoint was submitted after the required reporting window.",
+    when: "32 min ago",
+    source: "Compliance Monitor",
+    actions: [
+      {
+        label: "Review compliance",
+        kind: "primary",
+        goto: "reporting",
+      },
+    ],
+  },
+
+  {
+    id: "AL-DOH-3101",
+    audience: "regulator",
+    severity: "warn",
+    title: "Afternoon report pending — Lipa Medix",
+    desc: "The 4:00 PM blood-stock checkpoint has not yet been recorded.",
+    when: "12 min ago",
+    source: "Compliance Monitor",
+    actions: [
+      {
+        label: "View reports",
+        kind: "ghost",
+        goto: "reporting",
+      },
+    ],
+  },
+
+  {
+    id: "AL-PRC-2101",
+    audience: "prc_admin",
+    severity: "critical",
+    title: "Blood-bank replenishment needed — AB− PRBC",
+    desc: "Mary Mediatrix reports 1 AB− unit on hand and no redistributable stock.",
+    when: "4 min ago",
+    source: "Consortium Supply Monitor",
+    actions: [
+      {
+        label: "Review supply requests",
+        kind: "primary",
+        goto: "transfers",
+      },
+    ],
+  },
+
+  {
+    id: "AL-PRC-2100",
+    audience: "prc_admin",
+    severity: "warn",
+    title: "Low O− reserve reported by Mary Mediatrix",
+    desc: "The blood bank reports 2 units on hand. PRC supply coordination may be required.",
+    when: "18 min ago",
+    source: "Consortium Supply Monitor",
+    actions: [
+      {
+        label: "Open coordination",
+        kind: "ghost",
+        goto: "transfers",
+      },
+    ],
+  },
+
+  {
+    id: "AL-REQ-1042",
+    audience: "requester",
+    hospitalId: "LMC-LIP",
+    severity: "info",
+    title: "Request approved — O+ PRBC",
+    desc: "The supplying blood bank approved 2 units. Preparation is in progress.",
+    when: "9 min ago",
+    source: "Request Coordination",
+    actions: [
+      {
+        label: "Track request",
+        kind: "primary",
+        goto: "transfers",
+      },
+    ],
+  },
+
+  {
+    id: "AL-REQ-1041",
+    audience: "requester",
+    hospitalId: "LMC-LIP",
+    severity: "warn",
+    title: "Inbound receipt confirmation pending",
+    desc: "A dispatched blood transfer is awaiting confirmation at your facility.",
+    when: "24 min ago",
+    source: "Transfer Tracking",
+    actions: [
+      {
+        label: "Review transfer",
+        kind: "primary",
+        goto: "transfers",
+      },
+    ],
+  },
+
+  {
     id: "AL-7741",
     severity: "critical",
     title: "Critical shortage — AB− PRBC",
@@ -929,6 +1027,33 @@ window.REPORTING = {
   completion: [],
 };
 
+// Regulator-facing mock status for the combined DOH dashboard. This avoids
+// exposing operational unit details while still showing who met each required
+// reporting checkpoint.
+window.COMPLIANCE_STATUS = [
+  {
+    facilityId: "MMC-LIP",
+    morning: "Submitted",
+    afternoon: "Submitted",
+    lastSubmission: "2026-08-19 16:03",
+    status: "Compliant",
+  },
+  {
+    facilityId: "MDH-LIP",
+    morning: "Submitted",
+    afternoon: "Pending",
+    lastSubmission: "2026-08-19 09:06",
+    status: "Due Today",
+  },
+  {
+    facilityId: "CLH-LIP",
+    morning: "Late",
+    afternoon: "Submitted",
+    lastSubmission: "2026-08-19 16:11",
+    status: "Late Submission",
+  },
+];
+
 // Three participating hospital blood banks. `total` is on-hand stock while
 // `available` is the quantity released for consortium redistribution.
 window.CONSORTIUM_BANKS = [
@@ -1014,7 +1139,6 @@ window.MOCK_ACCOUNTS = [
   { email: "r.reyes@mmc.bloodledger", password: "BloodLedger2026!", name: "Dr. R. Reyes", initials: "RR", hospital: "MMC-LIP", role: "Blood Bank Head" },
   { email: "a.garcia@mmc.bloodledger", password: "BloodLedger2026!", name: "A. Garcia", initials: "AG", hospital: "MMC-LIP", role: "System Administrator" },
 
-  { email: "p.cruz@prc.bloodledger", password: "BloodLedger2026!", name: "P. Cruz", initials: "PC", hospital: "PRC-LIP", role: "PRC Officer" },
   { email: "l.mendoza@prc.bloodledger", password: "BloodLedger2026!", name: "L. Mendoza", initials: "LM", hospital: "PRC-LIP", role: "PRC Administrator" },
 
   { email: "j.ramos@metrolipa.bloodledger", password: "BloodLedger2026!", name: "J. Ramos, RMT", initials: "JR", hospital: "LMC-LIP", role: "Medical Technologist" },
@@ -1037,7 +1161,6 @@ window.USER_PROFILE_DETAILS = {
   "r.reyes@mmc.bloodledger": { employeeId: "MMC-BBH-0042", position: "Blood Bank Head", phone: "+63 917 555 0142", professionalLicense: "PRC-MD-0084217", applicationId: "APP-2026-0142", submitted: "2026-07-10 09:16", approvedAt: "2026-07-15 10:30", approvedBy: "PRC System Administration", status: "Active", lastSignIn: "2026-08-11 09:42" },
   "m.santos@mmc.bloodledger": { employeeId: "MMC-MT-0187", position: "Medical Technologist", phone: "+63 917 555 0187", professionalLicense: "PRC-MT-0063187", applicationId: "APP-2026-0142", approvedAt: "2026-07-15 10:30", status: "Active" },
   "a.garcia@mmc.bloodledger": { employeeId: "MMC-IT-0031", position: "System Administrator", phone: "+63 917 555 0031", applicationId: "APP-2026-0142", approvedAt: "2026-07-15 10:30", status: "Active" },
-  "p.cruz@prc.bloodledger": { employeeId: "PRC-LIP-0118", position: "PRC Officer", phone: "+63 917 555 0118", applicationId: "PRC-SYS-2026-001", approvedAt: "2026-07-01 08:00", status: "Active" },
   "l.mendoza@prc.bloodledger": { employeeId: "PRC-LIP-0007", position: "PRC System Administrator", phone: "+63 917 555 0007", applicationId: "PRC-SYS-2026-001", approvedAt: "2026-07-01 08:00", status: "Active" },
   "j.ramos@metrolipa.bloodledger": { employeeId: "LMC-MT-0284", position: "Medical Technologist", phone: "+63 917 555 0284", professionalLicense: "PRC-MT-0059284", applicationId: "APP-2026-0179", submitted: "2026-07-28 13:20", approvedAt: "2026-08-04 10:12", approvedBy: "L. Mendoza", status: "Active" },
   "c.tan@metrolipa.bloodledger": { employeeId: "LMC-AR-0116", position: "Authorized Requester", phone: "+63 917 555 0116", applicationId: "APP-2026-0179", approvedAt: "2026-08-04 10:12", status: "Active" },

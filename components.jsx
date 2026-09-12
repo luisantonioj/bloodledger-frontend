@@ -443,7 +443,7 @@ function buildPermissions(
     canManageAccounts,
 
     canViewDashboard:
-      !canManageAccounts,
+      key !== "system",
 
     canViewInventory:
       bloodBankOperator,
@@ -455,16 +455,16 @@ function buildPermissions(
       bloodBank,
 
     canViewTransfers:
-      !canManageAccounts,
+      key !== "regulator" && key !== "system",
 
     canViewAlerts:
-      !canManageAccounts,
+      key !== "system",
 
     canViewAudit:
-      true,
+      key !== "regulator",
 
     canViewReporting:
-      !secondary,
+      bloodBank || key === "regulator",
 
     canCreateTransfer:
       !readOnly &&
@@ -492,6 +492,38 @@ function buildPermissions(
     canAcknowledge:
       !readOnly,
   };
+}
+
+
+function visibleAlertsForRole(
+  rows,
+  hospital,
+  permissions
+) {
+  const alerts = rows || [];
+
+  if (permissions?.roleKey === "prc_admin") {
+    return alerts.filter((alert) => alert.audience === "prc_admin");
+  }
+
+  if (permissions?.requester) {
+    return alerts.filter(
+      (alert) =>
+        alert.hospitalId === hospital?.id &&
+        (alert.audience === "requester" ||
+          ["Request Coordination", "Transfer Tracking"].includes(alert.source))
+    );
+  }
+
+  if (permissions?.roleKey === "regulator") {
+    return alerts.filter((alert) => alert.audience === "regulator");
+  }
+
+  return alerts.filter(
+    (alert) =>
+      !alert.audience &&
+      (!alert.hospitalId || alert.hospitalId === hospital?.id)
+  );
 }
 
 
@@ -611,7 +643,9 @@ function Sidebar({
 
     {
       label:
-        "Requests & Activity",
+        permissions?.roleKey === "regulator"
+          ? "Oversight"
+          : "Requests & Activity",
 
       items: [
         {
@@ -1525,6 +1559,7 @@ Object.assign(
     roleKey,
     isSecondaryHospital,
     buildPermissions,
+    visibleAlertsForRole,
     transferStatusKind,
   }
 );
