@@ -90,6 +90,15 @@ function AuditPage({ hospital, permissions, onNav, auditRows: sharedAuditRows })
     );
   });
 
+  const exportActivity = () => exportCsvReport({
+    title: "Activity History",
+    scope: `${hospital?.name} · permitted activity records`,
+    filters: { activityType: typeFilter, search: search || "None" },
+    headers: ["Date and time", "Activity", "Operator / source", "Operator staff ID", "Classification", "Facility ID", "Scan ID", "Request ID", "Transfer ID", "Status", "Blockchain ID"],
+    rows: filtered.map((row) => [row.timestamp || row.time || row.ts, row.action || row.type, row.operatorName || row.user || row.actor || row.source, row.operatorStaffId, row.operatorClassification || row.role, row.facilityId || hospital?.id, row.scanId, row.requestId, row.transferId || row.transfer, row.status, row.blockchainId || row.txHash || row.tx_hash]),
+    filename: "activity-history",
+  });
+
   return (
     <div className="page">
       <PageHead
@@ -100,6 +109,7 @@ function AuditPage({ hospital, permissions, onNav, auditRows: sharedAuditRows })
         }
         title="Activity History"
         sub="Review recent inventory, request, and transfer activities recorded in the system."
+        actions={permissions?.canExportAudit ? <Btn icon="download" onClick={exportActivity}>Export CSV</Btn> : null}
       />
 
       <div className="card">

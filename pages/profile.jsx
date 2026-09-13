@@ -1,6 +1,6 @@
 // pages/profile.jsx - Signed-in identity and approved institution record.
 
-function ProfilePage({ hospital, session, permissions, accountApplications }) {
+function ProfilePage({ hospital, session, permissions, accountApplications, staffDirectory }) {
   const email = session?.user?.username || session?.user?.email || "";
   const account = (window.MOCK_ACCOUNTS || []).find(
     (item) => item.email.toLowerCase() === email.toLowerCase()
@@ -12,22 +12,18 @@ function ProfilePage({ hospital, session, permissions, accountApplications }) {
   );
   const application = submittedApplication || storedProfile.application || {};
   const applicationFacility = application.facility || {};
-  const [contact, setContact] = React.useState({
-    phone: storedProfile.phone || applicationFacility.phone || "Not recorded",
-    email,
-  });
-  const [editingContact, setEditingContact] = React.useState(false);
   const [passwordModal, setPasswordModal] = React.useState(false);
   const [passwords, setPasswords] = React.useState({ current: "", next: "", confirm: "" });
   const toast = React.useContext(ToastCtx);
+  const facilityStaff = (staffDirectory || window.STAFF_DIRECTORY || {})[hospital?.id] || [];
 
   const person = {
-    name: application.name || account.name || session?.user?.name || "Authorized user",
-    position: applicationFacility.position || storedProfile.position || account.role || session?.user?.role,
-    employeeId: application.employee_id || applicationFacility.employeeId || storedProfile.employeeId || "Not recorded",
-    phone: contact.phone,
-    email: contact.email,
-    license: applicationFacility.medtechLicense || storedProfile.professionalLicense || "Not applicable",
+    name: account.name || session?.user?.name || application.institution_name || "Authorized facility",
+    position: account.role || session?.user?.role || "Approved organizational account",
+    employeeId: hospital?.id || "Not recorded",
+    phone: facilityProfile.phone || hospital?.phone || "Not recorded",
+    email,
+    license: "Not applicable to facility account",
   };
 
   const facility = {
@@ -48,15 +44,6 @@ function ProfilePage({ hospital, session, permissions, accountApplications }) {
   const documents = application.documents || facilityProfile.documents || [];
   const accountStatus = application.status === "Pending Review" ? "Pending Review" : storedProfile.status || "Active";
   const applicationId = application.id || storedProfile.applicationId || "Legacy consortium account";
-
-  const saveContact = () => {
-    window.USER_PROFILE_DETAILS = {
-      ...(window.USER_PROFILE_DETAILS || {}),
-      [email]: { ...storedProfile, phone: contact.phone },
-    };
-    setEditingContact(false);
-    toast.push({ kind: "ok", text: "Contact information updated", sub: "Your profile phone number was updated for this prototype session." });
-  };
 
   const updatePassword = () => {
     if (passwords.current !== account.password) {
@@ -82,13 +69,13 @@ function ProfilePage({ hospital, session, permissions, accountApplications }) {
       <PageHead
         eyebrow={hospital?.short || "BloodLedger"}
         title="My Profile"
-        sub="Review your approved identity, facility affiliation, and BloodLedger access."
+        sub="Review the approved Facility Account, institutional application, and read-only Staff Directory."
       />
 
       <div className="profile-identity-card">
         <div className="profile-avatar">{session?.user?.initials || "U"}</div>
         <div className="profile-identity-copy">
-          <div className="page-eyebrow">Authorized consortium user</div>
+          <div className="page-eyebrow">Approved Facility Account</div>
           <h2>{person.name}</h2>
           <div>{person.email}</div>
           <div className="profile-chip-row">
@@ -106,17 +93,16 @@ function ProfilePage({ hospital, session, permissions, accountApplications }) {
       <div className="profile-layout">
         <div className="profile-main-column">
           <ProfileSection
-            title="Personal Information"
-            sub="Primary account details submitted during institutional application."
-            action={<Btn size="sm" kind="ghost" icon="user" onClick={() => setEditingContact(true)}>Edit Contact</Btn>}
+            title="Facility Account"
+            sub="Organizational credentials provisioned after PRC approval. Individual attribution is selected inside transaction confirmations."
           >
             <div className="profile-field-grid">
-              <ProfileField label="Full Name" value={person.name} />
-              <ProfileField label="Official Position" value={person.position} />
-              <ProfileField label="Employee ID" value={person.employeeId} mono />
-              <ProfileField label="Institutional Email" value={person.email} />
-              <ProfileField label="Contact Number" value={person.phone} />
-              <ProfileField label="Professional License" value={person.license} mono />
+              <ProfileField label="Account Name" value={person.name} />
+              <ProfileField label="Account Type" value={person.position} />
+              <ProfileField label="Facility ID" value={person.employeeId} mono />
+              <ProfileField label="Facility Login Email" value={person.email} />
+              <ProfileField label="Official Contact" value={person.phone} />
+              <ProfileField label="Account Status" value={accountStatus} />
             </div>
           </ProfileSection>
 
@@ -132,6 +118,10 @@ function ProfilePage({ hospital, session, permissions, accountApplications }) {
               <ProfileField label="Official Phone" value={facility.officialPhone} />
             </div>
           </ProfileSection>
+
+          {facilityStaff.length > 0 && <ProfileSection title="Staff Directory" sub="Read-only personnel approved for transaction attribution. Manage records in Staff & Schedule.">
+            <div className="staff-table-wrap"><table><thead><tr><th>Staff member</th><th>Staff ID</th><th>Classification</th><th>Status</th></tr></thead><tbody>{facilityStaff.map((staff) => <tr key={staff.staffId}><td><div className="staff-person"><span>{staff.initials}</span><strong>{staff.name}</strong></div></td><td className="mono">{staff.staffId}</td><td>{staff.classification}</td><td><Chip kind={staff.status === "Active" ? "ok" : "neutral"} dot>{staff.status}</Chip></td></tr>)}</tbody></table></div>
+          </ProfileSection>}
 
           <ProfileSection title="Licensing & Qualification" sub="Approved regulatory and blood-service information.">
             <div className="profile-field-grid">
@@ -160,7 +150,7 @@ function ProfilePage({ hospital, session, permissions, accountApplications }) {
               <dt>Assigned Role</dt><dd>{session?.user?.role || account.role}</dd>
               <dt>Account Status</dt><dd><Chip kind={accountStatus === "Active" ? "ok" : "warn"} dot>{accountStatus}</Chip></dd>
               <dt>Facility ID</dt><dd className="mono small">{hospital?.id || "—"}</dd>
-              <dt>Access Scope</dt><dd>{permissions?.secondary ? "Requestor facility" : permissions?.canManageAccounts ? "System administration" : "Blood bank operations"}</dd>
+              <dt>Access Scope</dt><dd>{permissions?.secondary ? "Requestor facility" : permissions?.canManageAccounts ? "PRC system administration" : permissions?.bloodBank ? "Blood bank facility" : "Regulatory compliance"}</dd>
               <dt>Last Sign-in</dt><dd className="mono small">{storedProfile.lastSignIn || "2026-08-11 09:42"}</dd>
             </dl>
           </ProfileSection>
@@ -185,18 +175,10 @@ function ProfilePage({ hospital, session, permissions, accountApplications }) {
 
           <div className="profile-readonly-note">
             <I name="info" size={16} />
-            <span>Identity, role, facility, and licensing fields are based on the approved application. Contact PRC System Administration to request corrections.</span>
+            <span>The Facility Account and licensing fields are based on the approved application. Staff are selected only within transaction workflows and retain historical attribution if later made Inactive.</span>
           </div>
         </div>
       </div>
-
-      {editingContact && (
-        <Modal title="Edit Contact Information" sub="Only your contact number can be changed directly in this prototype." onClose={() => setEditingContact(false)} footer={<><Btn kind="ghost" onClick={() => setEditingContact(false)}>Cancel</Btn><Btn kind="primary" icon="check" onClick={saveContact}>Save Changes</Btn></>}>
-          <label className="request-field"><span>Institutional Email</span><input value={contact.email} disabled /></label>
-          <label className="request-field"><span>Contact Number</span><input value={contact.phone === "Not recorded" ? "" : contact.phone} onChange={(event) => setContact((current) => ({ ...current, phone: event.target.value }))} placeholder="Enter contact number" /></label>
-          <div className="profile-modal-note">Changes to your email, name, role, employee ID, or facility require administrator review.</div>
-        </Modal>
-      )}
 
       {passwordModal && (
         <Modal title="Change Password" sub="Update the password used for this BloodLedger account." onClose={() => setPasswordModal(false)} footer={<><Btn kind="ghost" onClick={() => setPasswordModal(false)}>Cancel</Btn><Btn kind="primary" icon="check" onClick={updatePassword}>Update Password</Btn></>}>

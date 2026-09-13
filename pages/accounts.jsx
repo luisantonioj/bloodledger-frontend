@@ -1,6 +1,6 @@
 // pages/accounts.jsx - PRC consortium system administration
 
-function AccountsPage({ hospital, session, permissions, accountApplications, onUpdateAccountApplications }) {
+function AccountsPage({ hospital, session, permissions, accountApplications, onUpdateAccountApplications, staffDirectory, onUpdateStaffDirectory }) {
   const [tab, setTab] = React.useState("overview");
   const [accounts, setAccounts] = React.useState(window.MOCK_ACCOUNTS || []);
   const [institutions, setInstitutions] = React.useState(window.HOSPITALS || []);
@@ -8,6 +8,8 @@ function AccountsPage({ hospital, session, permissions, accountApplications, onU
   const [search, setSearch] = React.useState("");
   const [decision, setDecision] = React.useState(null);
   const [deleteTarget, setDeleteTarget] = React.useState(null);
+  const [recoveryTarget, setRecoveryTarget] = React.useState(null);
+  const [recoveryStaffId, setRecoveryStaffId] = React.useState("");
   const [note, setNote] = React.useState("");
   const toast = React.useContext(ToastCtx);
   const applications = accountApplications || window.PENDING_ACCOUNTS || [];
@@ -64,8 +66,8 @@ function AccountsPage({ hospital, session, permissions, accountApplications, onU
       setInstitutions(nextInstitutions);
       window.HOSPITALS = nextInstitutions;
       window.INSTITUTION_ROLES[assignedHospital] = decision.applicant_type === "Blood Bank"
-        ? [{ id: "Blood Bank Administrator", label: "Blood Bank Administrator", sub: "Manage the approved blood-bank institution." }]
-        : [{ id: "Authorized Requester", label: "Authorized Requester", sub: "Create and monitor blood requests." }];
+        ? [{ id: "Blood Bank Facility Account", label: "Blood Bank Facility Account", sub: "Shared operational access for the approved blood bank." }]
+        : [{ id: "Requestor Facility Account", label: "Requestor Facility Account", sub: "Shared request and receipt access for the approved facility." }];
     }
 
     const nextApplications = applications.map((item) => item.id === decision.id ? {
@@ -93,10 +95,25 @@ function AccountsPage({ hospital, session, permissions, accountApplications, onU
       const nextAccounts = accounts.some((item) => item.email === approvedAccount.email) ? accounts : [...accounts, approvedAccount];
       setAccounts(nextAccounts);
       window.MOCK_ACCOUNTS = nextAccounts;
+      const classification = decision.applicant_type === "Blood Bank" ? "Blood Bank Head" : "Facility Administrator";
+      const firstStaff = {
+        staffId: decision.employee_id,
+        name: decision.name,
+        initials,
+        classification,
+        status: "Active",
+        professionalLicense: decision.facility?.headLicense || decision.facility?.medtechLicense || null,
+        phone: decision.facility?.phone || null,
+        adminPin: "2468",
+        createdFromApplication: decision.id,
+      };
+      const nextDirectory = { ...(staffDirectory || window.STAFF_DIRECTORY || {}), [assignedHospital]: [firstStaff] };
+      onUpdateStaffDirectory?.(nextDirectory);
+      window.STAFF_DIRECTORY = nextDirectory;
     }
 
     recordAdminAction(`${status} application`, decision.id, `${decision.applicant_type} application for ${decision.institution_name || hospitalById(decision.hospital)?.name}. ${note.trim()}`);
-    toast.push({ kind: status === "Approved" ? "ok" : "warn", text: `Application ${status.toLowerCase()}`, sub: status === "Approved" ? "Institution and primary account provisioned." : "The rejection reason has been recorded." });
+    toast.push({ kind: status === "Approved" ? "ok" : "warn", text: `Application ${status.toLowerCase()}`, sub: status === "Approved" ? "Facility Account and first responsible staff record provisioned." : "The rejection reason has been recorded." });
     setDecision(null);
     setNote("");
   };
@@ -109,6 +126,24 @@ function AccountsPage({ hospital, session, permissions, accountApplications, onU
     recordAdminAction("Deleted account", deleteTarget.email, note.trim());
     toast.push({ kind: "warn", text: "Account deleted", sub: `${deleteTarget.name} no longer has prototype access.` });
     setDeleteTarget(null);
+    setNote("");
+  };
+
+  const recoverAdministrator = () => {
+    if (!recoveryTarget || !recoveryStaffId || !note.trim()) return;
+    const roster = (staffDirectory || window.STAFF_DIRECTORY || {})[recoveryTarget.id] || [];
+    const replacement = roster.find((staff) => staff.staffId === recoveryStaffId && staff.status === "Active");
+    if (!replacement) return;
+    const adminClass = recoveryTarget.is_blood_bank ? "Blood Bank Head" : "Facility Administrator";
+    const staffClass = recoveryTarget.is_blood_bank ? "Blood Bank Staff" : "Requestor Staff";
+    const nextRoster = roster.map((staff) => staff.staffId === replacement.staffId ? { ...staff, classification: adminClass, adminPin: "2468" } : staff.classification === adminClass ? { ...staff, classification: staffClass, adminPin: undefined } : staff);
+    const nextDirectory = { ...(staffDirectory || window.STAFF_DIRECTORY || {}), [recoveryTarget.id]: nextRoster };
+    onUpdateStaffDirectory?.(nextDirectory);
+    window.STAFF_DIRECTORY = nextDirectory;
+    recordAdminAction("Recovered facility administrator", recoveryTarget.id, `${replacement.name} (${replacement.staffId}) assigned as ${adminClass}. ${note.trim()}`);
+    toast.push({ kind: "ok", text: "Administrator access recovered", sub: `${replacement.name} is the responsible ${adminClass}; mock PIN reset to 2468.` });
+    setRecoveryTarget(null);
+    setRecoveryStaffId("");
     setNote("");
   };
 
@@ -129,7 +164,7 @@ function AccountsPage({ hospital, session, permissions, accountApplications, onU
 
     {tab === "overview" && <AdminOverview accounts={accounts} pending={pending} institutions={activeInstitutions} activity={adminActivity} onOpen={setTab} />}
     {tab === "applications" && <ApplicationsTable applications={applications} institutions={institutions} onReview={(item) => { setDecision(item); setNote(""); }} />}
-    {tab === "institutions" && <InstitutionsTable institutions={activeInstitutions} accounts={accounts} />}
+    {tab === "institutions" && <InstitutionsTable institutions={activeInstitutions} accounts={accounts} onRecover={(institution) => { setRecoveryTarget(institution); setRecoveryStaffId(((staffDirectory || {})[institution.id] || []).find((staff) => staff.status === "Active")?.staffId || ""); setNote(""); }} />}
     {tab === "accounts" && <AccountsTable accounts={filteredAccounts} institutions={institutions} search={search} setSearch={setSearch} currentEmail={session?.user?.email} onDelete={(account) => { setDeleteTarget(account); setNote(""); }} />}
     {tab === "activity" && <AdminActivityTable activity={adminActivity} />}
 
@@ -139,6 +174,13 @@ function AccountsPage({ hospital, session, permissions, accountApplications, onU
       <div className="admin-delete-warning"><I name="warn" size={18} /><div><strong>{deleteTarget.name}</strong><span>{deleteTarget.email} · {deleteTarget.role}</span></div></div>
       <div className="field"><label htmlFor="delete-reason">Deletion reason</label><textarea id="delete-reason" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Required for the administrator audit record..." /></div>
       <div className="auth-approval-note" style={{ marginTop: 14 }}><I name="info" size={15} /><span>This is a reversible browser-session simulation. A production system should deactivate or archive accounts instead of permanently deleting audit-linked identities.</span></div>
+    </Modal>}
+
+    {recoveryTarget && <Modal title="Recover Facility Administrator" sub="PRC may document an administrator recovery when the responsible hospital administrator is unavailable." onClose={() => setRecoveryTarget(null)} footer={<><Btn kind="ghost" onClick={() => setRecoveryTarget(null)}>Cancel</Btn><Btn kind="primary" icon="shield" onClick={recoverAdministrator} disabled={!recoveryStaffId || !note.trim()}>Confirm Recovery</Btn></>}>
+      <label className="field"><span>Institution</span><input value={recoveryTarget.name} disabled /></label>
+      <label className="field"><span>Active replacement staff</span><select value={recoveryStaffId} onChange={(event) => setRecoveryStaffId(event.target.value)}>{((staffDirectory || {})[recoveryTarget.id] || []).filter((staff) => staff.status === "Active").map((staff) => <option key={staff.staffId} value={staff.staffId}>{staff.name} · {staff.staffId} · {staff.classification}</option>)}</select></label>
+      <label className="field"><span>Recovery basis</span><textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Required: document why the current Head/Administrator is unavailable and who authorized recovery…" /></label>
+      <div className="auth-approval-note"><I name="audit" size={15} /><span>This action transfers administrator responsibility, resets the mock administrative PIN to 2468, and creates a PRC administration record.</span></div>
     </Modal>}
   </div>;
 }
@@ -169,8 +211,8 @@ function ApplicationsTable({ applications, institutions, onReview }) {
   return <div className="card"><div className="card-h"><div><h3>Institution Applications</h3><div className="sub muted">Approve or reject Blood Bank and Requestor qualification submissions.</div></div></div><div className="card-b flush"><table className="tbl"><thead><tr><th>Application</th><th>Institution</th><th>Type</th><th>Primary Contact</th><th>Submitted</th><th>Status</th><th></th></tr></thead><tbody>{applications.map((item) => <tr key={item.id}><td className="mono tiny">{item.id}</td><td><strong>{item.institution_name || institutions.find((institution) => institution.id === item.hospital)?.short || item.hospital}</strong><div className="muted tiny">{item.facility?.facilityLevel || "Existing member institution"}</div></td><td>{item.applicant_type}</td><td><strong>{item.name}</strong><div className="muted tiny">{item.email}</div></td><td className="mono tiny">{item.submitted}</td><td><Chip kind={item.status === "Approved" ? "ok" : item.status === "Rejected" ? "critical" : "warn"} dot>{item.status}</Chip></td><td className="right"><Btn size="sm" onClick={() => onReview(item)}>{item.status === "Pending Review" ? "Review" : "View"}</Btn></td></tr>)}</tbody></table></div></div>;
 }
 
-function InstitutionsTable({ institutions, accounts }) {
-  return <div className="card"><div className="card-h"><div><h3>Consortium Institutions</h3><div className="sub muted">Approved BloodBank and Requestor institutions in BloodLedger.</div></div></div><div className="card-b flush"><table className="tbl"><thead><tr><th>Institution</th><th>Role</th><th>Peer / Provisioning ID</th><th>Authorized Users</th><th>Status</th></tr></thead><tbody>{institutions.map((item) => <tr key={item.id}><td><strong>{item.name}</strong><div className="mono tiny muted">{item.id}</div></td><td><Chip kind={item.is_blood_bank ? "info" : "neutral"}>{item.is_blood_bank ? "BloodBank" : "Requestor"}</Chip></td><td className="mono tiny">{item.peer_id}</td><td className="tnum">{accounts.filter((account) => account.hospital === item.id).length}</td><td><Chip kind="ok" dot>{item.membership_status || "Active"}</Chip></td></tr>)}</tbody></table></div></div>;
+function InstitutionsTable({ institutions, accounts, onRecover }) {
+  return <div className="card"><div className="card-h"><div><h3>Consortium Institutions</h3><div className="sub muted">Approved BloodBank and Requestor institutions in BloodLedger.</div></div></div><div className="card-b flush"><table className="tbl"><thead><tr><th>Institution</th><th>Role</th><th>Peer / Provisioning ID</th><th>Facility Accounts</th><th>Status</th><th></th></tr></thead><tbody>{institutions.map((item) => <tr key={item.id}><td><strong>{item.name}</strong><div className="mono tiny muted">{item.id}</div></td><td><Chip kind={item.is_blood_bank ? "info" : "neutral"}>{item.is_blood_bank ? "Blood Bank" : "Requestor"}</Chip></td><td className="mono tiny">{item.peer_id}</td><td className="tnum">{accounts.filter((account) => account.hospital === item.id).length}</td><td><Chip kind="ok" dot>{item.membership_status || "Active"}</Chip></td><td className="right"><Btn size="sm" kind="ghost" onClick={() => onRecover(item)}>Recover Administrator</Btn></td></tr>)}</tbody></table></div></div>;
 }
 
 function AccountsTable({ accounts, institutions, search, setSearch, currentEmail, onDelete }) {

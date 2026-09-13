@@ -5,7 +5,7 @@ function LoginPage({ onLogin, onSubmitApplication }) {
   const [mode, setMode] = React.useState("signin");
   const [applicationType, setApplicationType] = React.useState(null);
   const [step, setStep] = React.useState(1);
-  const [email, setEmail] = React.useState("r.reyes@mmc.bloodledger");
+  const [email, setEmail] = React.useState("bloodbank@mmc.bloodledger");
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [loginError, setLoginError] = React.useState("");
@@ -83,6 +83,10 @@ function LoginPage({ onLogin, onSubmitApplication }) {
       setApplicationError("Complete all required fields and declarations before continuing.");
       return;
     }
+    if (step === 3 && ((applicationType === "blood-bank" && form.position !== "Blood Bank Head") || (applicationType === "requestor" && form.position !== "Facility Administrator"))) {
+      setApplicationError(applicationType === "blood-bank" ? "A blood-bank application must be submitted by the institution-designated Blood Bank Head." : "A requestor application must be submitted by the Facility Administrator.");
+      return;
+    }
     if (step === 3 && (password !== confirmPassword || password.length < 8)) {
       setApplicationError("Use a password of at least 8 characters and make sure both passwords match.");
       return;
@@ -107,7 +111,8 @@ function LoginPage({ onLogin, onSubmitApplication }) {
       employee_id: form.employeeId,
       hospital: null,
       institution_name: form.facilityName,
-      role: applicationType === "blood-bank" ? "Blood Bank Administrator" : "Authorized Requester",
+      role: applicationType === "blood-bank" ? "Blood Bank Facility Account" : "Requestor Facility Account",
+      applicant_classification: applicationType === "blood-bank" ? "Blood Bank Head" : "Facility Administrator",
       applicant_type: applicationType === "blood-bank" ? "Blood Bank" : "Requestor",
       submitted: new Date().toISOString().slice(0, 16).replace("T", " "),
       status: "Pending Review",
@@ -148,7 +153,7 @@ function LoginPage({ onLogin, onSubmitApplication }) {
 
       {mode === "signin" ? (
         <form className="auth-form" onSubmit={submitSignIn}>
-          <div><div className="page-eyebrow">Welcome back</div><h1 className="auth-title">Sign in to BloodLedger</h1><p className="auth-copy">Use the email address associated with your approved account.</p></div>
+          <div><div className="page-eyebrow">Welcome back</div><h1 className="auth-title">Sign in to BloodLedger</h1><p className="auth-copy">Use the approved Facility Account or PRC/DOH organizational email.</p></div>
           <div className="field"><label htmlFor="login-email">Email address</label><input id="login-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@hospital.org" required /></div>
           <div className="field"><div className="auth-label-row"><label htmlFor="login-password">Password</label><button type="button" className="auth-text-button">Forgot password?</button></div><input id="login-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" required /></div>
           <label className="auth-check"><input type="checkbox" /><span>Keep me signed in on this trusted device</span></label>
@@ -157,7 +162,7 @@ function LoginPage({ onLogin, onSubmitApplication }) {
         </form>
       ) : !applicationType ? (
         <div className="auth-application-choice">
-          <div><div className="page-eyebrow">Institution application</div><h1 className="auth-title">How will your facility participate?</h1><p className="auth-copy">Choose one application. Approval establishes the institution first; individual staff accounts can be authorized afterward.</p></div>
+          <div><div className="page-eyebrow">Institution application</div><h1 className="auth-title">How will your facility participate?</h1><p className="auth-copy">Choose one application. Approval provisions one Facility Account and creates the applicant as the first responsible staff record.</p></div>
           <div className="application-type-grid">
             <button type="button" onClick={() => { setApplicationType("blood-bank"); setStep(1); }}>
               <span className="application-type-icon"><I name="inventory" size={22} /></span>
@@ -249,12 +254,12 @@ function QualificationApplicationStep({ type, form, update }) {
 
 function PrimaryAccountStep({ form, update, password, setPassword, confirmPassword, setConfirmPassword }) {
   return <div className="application-section">
-    <div className="application-section-title"><h3>Authorized primary account</h3><p>This person will act as the institution’s initial BloodLedger contact after approval.</p></div>
+    <div className="application-section-title"><h3>Facility Account applicant</h3><p>The designated Blood Bank Head or Facility Administrator submits the application and becomes the first responsible staff record after approval.</p></div>
     <div className="application-fields-grid">
       <AppField label="Full name"><input value={form.fullName} onChange={(event) => update("fullName", event.target.value)} required /></AppField>
-      <AppField label="Official position"><input value={form.position} onChange={(event) => update("position", event.target.value)} placeholder="e.g. Blood Bank Head" required /></AppField>
+      <AppField label="Official position"><select value={form.position} onChange={(event) => update("position", event.target.value)} required><option value="">Select applicant position</option><option>Blood Bank Head</option><option>Facility Administrator</option></select></AppField>
       <AppField label="Employee ID"><input value={form.employeeId} onChange={(event) => update("employeeId", event.target.value)} required /></AppField>
-      <AppField label="Institutional email"><input type="email" value={form.accountEmail} onChange={(event) => update("accountEmail", event.target.value)} required /></AppField>
+      <AppField label="Facility Account email"><input type="email" value={form.accountEmail} onChange={(event) => update("accountEmail", event.target.value)} placeholder="bloodbank@facility.bloodledger" required /></AppField>
       <AppField label="Password"><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength="8" required /></AppField>
       <AppField label="Confirm password"><input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength="8" required />{confirmPassword && password !== confirmPassword && <small className="auth-error">Passwords do not match.</small>}</AppField>
     </div>

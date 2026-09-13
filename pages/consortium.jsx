@@ -50,6 +50,18 @@ function ConsortiumPage({ hospital, permissions, onNav }) {
     });
   };
 
+  const exportConsortium = () => {
+    const types = selectedType === "ALL" ? BLOOD_TYPES : [selectedType];
+    exportCsvReport({
+      title: "Consortium Inventory",
+      scope: `${hospital?.name} · authorized blood-bank consortium scope`,
+      filters: { component, bloodType: selectedType, chartView: view },
+      headers: ["Participating blood bank", ...types.flatMap((type) => [`${type} redistributable`, `${type} total on hand`]), "Status", "Last updated"],
+      rows: bankRows.map((bank) => [bank.facility.name, ...types.flatMap((type) => [bank.inventory[type].available, bank.inventory[type].total]), bank.status, bank.lastUpdated]),
+      filename: "consortium-inventory",
+    });
+  };
+
   return (
     <div className="page consortium-page">
       <PageHead
@@ -60,7 +72,7 @@ function ConsortiumPage({ hospital, permissions, onNav }) {
             ? "Find blood units released for redistribution by participating blood banks."
             : "Monitor on-hand and redistributable blood supply across participating hospital blood banks."
         }
-        actions={<Chip kind="ok" dot>Network synchronized</Chip>}
+        actions={<div className="export-button-group">{permissions?.canExportConsortium && <Btn icon="download" onClick={exportConsortium}>Export CSV</Btn>}<Chip kind="ok" dot>Network synchronized</Chip></div>}
       />
 
       <div className="consortium-summary-grid">
@@ -146,7 +158,7 @@ function ConsortiumPage({ hospital, permissions, onNav }) {
         </div>
       </div>
 
-      <div className="consortium-disclosure"><I name="info" size={16} /><span>Redistributable quantities exclude reserved units and each blood bank's configured safety stock. Availability remains subject to Blood Bank Head approval and release validation.</span></div>
+      <div className="consortium-disclosure"><I name="info" size={16} /><span>Redistributable quantities exclude reserved units and each blood bank's configured safety stock. Availability remains subject to authorized human review and release validation.</span></div>
     </div>
   );
 }

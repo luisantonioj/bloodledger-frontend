@@ -123,6 +123,9 @@ const ICONS = {
   upload:
     "M12 20V8m-5 5 5-5 5 5M4 4h16",
 
+  calendar:
+    "M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Zm3 8h3m2 0h3m-8 4h3m2 0h3",
+
   link:
     "M9 15l6-6m-3-3 1-1a4 4 0 1 1 5.6 5.6L17 12M7 12l-1.6 1.6a4 4 0 0 0 5.6 5.6L12 18",
 
@@ -347,6 +350,14 @@ function roleKey(
     return "prc";
   }
 
+  if (r.includes("BLOOD BANK FACILITY")) {
+    return "blood_bank_facility";
+  }
+
+  if (r.includes("REQUESTOR FACILITY")) {
+    return "requestor_facility";
+  }
+
   if (
     r.includes(
       "BLOOD BANK HEAD"
@@ -411,6 +422,9 @@ function buildPermissions(
   const bloodBank =
     Boolean(session?.hospital?.is_blood_bank);
 
+  const facilityAccount =
+    ["blood_bank_facility", "requestor_facility"].includes(key);
+
   const readOnly =
     key ===
       "regulator" ||
@@ -425,7 +439,11 @@ function buildPermissions(
 
   const bloodBankOperator =
     bloodBank &&
-    ["admin", "technologist"].includes(key);
+    ["admin", "technologist", "blood_bank_facility"].includes(key);
+
+  const requestorOperator =
+    secondary &&
+    ["requester", "technologist", "requestor_facility"].includes(key);
 
   return {
     roleKey:
@@ -441,6 +459,11 @@ function buildPermissions(
       secondary,
 
     canManageAccounts,
+
+    facilityAccount,
+
+    canManageStaff:
+      facilityAccount,
 
     canViewDashboard:
       key !== "system",
@@ -468,7 +491,8 @@ function buildPermissions(
 
     canCreateTransfer:
       !readOnly &&
-      !canManageAccounts,
+      !canManageAccounts &&
+      (bloodBankOperator || requestorOperator),
 
     canCreateRequest:
       (secondary || bloodBank) &&
@@ -482,12 +506,31 @@ function buildPermissions(
 
     canScan:
       bloodBankOperator ||
-      (secondary && !readOnly && !canManageAccounts),
+      requestorOperator,
 
     canApprove:
-      key ===
-        "admin" &&
-      bloodBank,
+      bloodBankOperator,
+
+    canProcessRequests:
+      bloodBankOperator,
+
+    canViewAnalytics:
+      bloodBankOperator || key === "prc_admin",
+
+    canExportInventory:
+      bloodBankOperator,
+
+    canExportTransactions:
+      bloodBankOperator || requestorOperator,
+
+    canExportTransfers:
+      bloodBankOperator || requestorOperator || key === "prc_admin",
+
+    canExportAudit:
+      key !== "regulator",
+
+    canExportConsortium:
+      bloodBankOperator,
 
     canAcknowledge:
       !readOnly,
@@ -712,6 +755,24 @@ function Sidebar({
           icon: "user",
           badge: badges.accounts,
           show: permissions?.canManageAccounts,
+        },
+        {
+          id: "staff",
+          name: "Staff & Schedule",
+          icon: "calendar",
+          show: permissions?.canManageStaff,
+        },
+      ],
+    },
+
+    {
+      label: "Insights",
+      items: [
+        {
+          id: "analytics",
+          name: "Analytics",
+          icon: "reporting",
+          show: permissions?.canViewAnalytics,
         },
       ],
     },
@@ -1530,6 +1591,188 @@ function fmtDate(
 }
 
 
+// ───── Facility attribution & CSV reporting ───────────────
+
+function activeStaffForFacility(facilityId, directory) {
+  return ((directory || window.STAFF_DIRECTORY || {})[facilityId] || [])
+    .filter((staff) => staff.status === "Active");
+}
+
+
+function parseFacilityDateTime(value) {
+  const date = new Date(String(value || "").replace(" ", "T"));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+
+function currentDutyForFacility(facilityId, schedules, at) {
+  const now = at || new Date();
+  const current = ((schedules || window.DUTY_SCHEDULES || {})[facilityId] || [])
+    .filter((entry) => {
+      const start = parseFacilityDateTime(entry.shift_start);
+      const end = parseFacilityDateTime(entry.shift_end);
+      return start && end && start <= now && now <= end;
+    });
+  return {
+    primary: current.find((entry) => entry.assignment === "Primary") || null,
+    supporting: current.filter((entry) => entry.assignment === "Supporting"),
+    entries: current,
+  };
+}
+
+
+function operatorById(facilityId, staffId, directory) {
+  return activeStaffForFacility(facilityId, directory)
+    .find((staff) => staff.staffId === staffId) || null;
+}
+
+
+function transactionAttribution(facilityId, staff, action) {
+  const timestamp = new Date().toISOString().slice(0, 19).replace("T", " ");
+  return {
+    facilityId,
+    operatorStaffId: staff?.staffId || null,
+    operatorName: staff?.name || null,
+    operatorClassification: staff?.classification || null,
+    action,
+    timestamp,
+    ledgerId: `0x${Math.random().toString(16).slice(2).padEnd(64, "0").slice(0, 64)}`,
+  };
+}
+
+
+function csvCell(value) {
+  const normalized = value == null || value === "" ? "Not available" : String(value);
+  return `"${normalized.replace(/"/g, '""')}"`;
+}
+
+
+function exportCsvReport({ title, scope, filters, headers, rows, filename, simulation }) {
+  const filterText = Object.entries(filters || {})
+    .filter(([, value]) => value != null && value !== "" && value !== "All")
+    .map(([key, value]) => `${key}: ${value}`)
+    .join("; ") || "None";
+  const generatedAt = new Date().toISOString();
+  const lines = [
+    ["Report title", title],
+    ["Reporting scope", scope || "Authorized facility scope"],
+    ["Active filters", filterText],
+    ["Generated at", generatedAt],
+    ["Simulation status", simulation ? "Synthetic / simulation only" : "Operational mock records"],
+    [],
+    headers,
+    ...(rows || []),
+  ];
+  const content = `\ufeff${lines.map((row) => row.map(csvCell).join(",")).join("\r\n")}`;
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `${filename || title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${generatedAt.slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+
+function parseCsvText(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+  const source = String(text || "").replace(/^\ufeff/, "");
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === '"' && quoted && source[index + 1] === '"') {
+      cell += '"';
+      index += 1;
+    } else if (char === '"') quoted = !quoted;
+    else if (char === "," && !quoted) {
+      row.push(cell.trim());
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && source[index + 1] === "\n") index += 1;
+      row.push(cell.trim());
+      if (row.some((value) => value !== "")) rows.push(row);
+      row = [];
+      cell = "";
+    } else cell += char;
+  }
+  row.push(cell.trim());
+  if (row.some((value) => value !== "")) rows.push(row);
+  return rows;
+}
+
+
+function OperatorSelector({ hospital, staffDirectory, dutySchedules, operatorId, onOperatorChange, compact }) {
+  const facilityId = hospital?.id;
+  const active = activeStaffForFacility(facilityId, staffDirectory);
+  const duty = currentDutyForFacility(facilityId, dutySchedules);
+  const effectiveId = operatorId || duty.primary?.staff_id || "";
+  const [pendingId, setPendingId] = React.useState("");
+  const [reason, setReason] = React.useState("Schedule change");
+  const [other, setOther] = React.useState("");
+  const ordered = [...active].sort((a, b) => {
+    const rank = (staff) => staff.staffId === duty.primary?.staff_id ? 0 : duty.supporting.some((entry) => entry.staff_id === staff.staffId) ? 1 : 2;
+    return rank(a) - rank(b) || a.name.localeCompare(b.name);
+  });
+  const current = operatorById(facilityId, effectiveId, staffDirectory);
+  const pending = operatorById(facilityId, pendingId, staffDirectory);
+
+  const select = (nextId) => {
+    if (!effectiveId) {
+      onOperatorChange?.(nextId, "Manual selection");
+      return;
+    }
+    if (nextId !== effectiveId) setPendingId(nextId);
+  };
+
+  const confirm = () => {
+    if (reason === "Other" && !other.trim()) return;
+    onOperatorChange?.(pendingId, reason === "Other" ? `Other: ${other.trim()}` : reason, duty.primary?.staff_id || null, duty.primary?.shift_end || null);
+    setPendingId("");
+    setReason("Schedule change");
+    setOther("");
+  };
+
+  return (
+    <div className={`operator-selector ${compact ? "compact" : ""}`}>
+      <div>
+        <span className="page-eyebrow">Transaction operator</span>
+        <strong>{current ? `${current.name} · ${current.classification}` : "Select an Active staff member"}</strong>
+        <small>{duty.primary ? `Scheduled Primary · ${duty.primary.shift_start}–${duty.primary.shift_end}` : "No matching duty schedule; manual selection required."}</small>
+      </div>
+      <label>
+        <span className="sr-only">Transaction operator</span>
+        <select value={effectiveId} onChange={(event) => select(event.target.value)}>
+          <option value="">Select operator…</option>
+          {ordered.map((staff) => (
+            <option key={staff.staffId} value={staff.staffId}>
+              {staff.name} · {staff.staffId} · {staff.classification}
+            </option>
+          ))}
+        </select>
+      </label>
+      {pendingId && (
+        <Modal
+          title="Confirm operator change"
+          sub="This override remains selected for the current shift and will be recorded in Activity History."
+          onClose={() => setPendingId("")}
+          footer={<><Btn kind="ghost" onClick={() => setPendingId("")}>Keep Current</Btn><Btn kind="primary" icon="check" disabled={reason === "Other" && !other.trim()} onClick={confirm}>Confirm Operator</Btn></>}
+        >
+          <dl className="kv">
+            <dt>Original</dt><dd>{current?.name || "No operator"} <span className="mono small">{current?.staffId}</span></dd>
+            <dt>Replacement</dt><dd>{pending?.name} <span className="mono small">{pending?.staffId}</span></dd>
+          </dl>
+          <label className="field"><span>Reason</span><select value={reason} onChange={(event) => setReason(event.target.value)}><option>Schedule change</option><option>Emergency coverage</option><option>Shift handover</option><option>Other</option></select></label>
+          {reason === "Other" && <label className="field"><span>Explanation</span><textarea value={other} maxLength="180" onChange={(event) => setOther(event.target.value)} placeholder="Briefly explain this operator override…" /></label>}
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+
 Object.assign(
   window,
   {
@@ -1561,5 +1804,13 @@ Object.assign(
     buildPermissions,
     visibleAlertsForRole,
     transferStatusKind,
+    activeStaffForFacility,
+    parseFacilityDateTime,
+    currentDutyForFacility,
+    operatorById,
+    transactionAttribution,
+    exportCsvReport,
+    parseCsvText,
+    OperatorSelector,
   }
 );

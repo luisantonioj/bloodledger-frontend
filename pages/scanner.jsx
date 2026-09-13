@@ -73,6 +73,11 @@ function ScannerPage({
   onNav,
   auditRows,
   onUpdateAudit,
+  staffDirectory,
+  dutySchedules,
+  operatorId,
+  operator,
+  onOperatorChange,
 }) {
   const inboundOnly = Boolean(permissions?.secondary);
   const emptyForm = {
@@ -583,6 +588,11 @@ function ScannerPage({
   const confirmTransaction = () => {
     if (!preview) return;
 
+    if (!operator) {
+      toast.push({ kind: "warn", text: "Transaction operator required", sub: "Select an Active staff member before recording this blood-unit transaction." });
+      return;
+    }
+
     if (inboundOnly && direction !== "Inbound") {
       toast.push({
         kind: "warn",
@@ -611,6 +621,7 @@ function ScannerPage({
         minute: "2-digit",
       }),
       recordedAt: now.toISOString(),
+      ...transactionAttribution(hospital?.id, operator, `${direction} blood unit transaction`),
     };
 
     const nextHistory = [transaction, ...history];
@@ -658,8 +669,12 @@ function ScannerPage({
     const nextAuditRows = [
       {
         ts: now.toISOString().slice(0, 19).replace("T", " "),
-        actor: session?.user?.username || session?.user?.name || "scanner",
-        role: session?.user?.role || "Operator",
+        actor: operator.name,
+        role: operator.classification,
+        facilityId: hospital?.id,
+        operatorStaffId: operator.staffId,
+        operatorName: operator.name,
+        operatorClassification: operator.classification,
         action:
           direction === "Inbound"
             ? "Blood unit received"
@@ -690,6 +705,15 @@ function ScannerPage({
     });
   };
 
+  const exportTransactions = () => exportCsvReport({
+    title: inboundOnly ? "Blood Unit Receipt History" : "Blood Unit Transactions",
+    scope: `${hospital?.name} · ${inboundOnly ? "inbound receipt history" : "authorized blood-unit transactions"}`,
+    filters: { direction: inboundOnly ? "Inbound" : "All permitted directions" },
+    headers: ["Recorded at", "Direction", "Scan ID", "Transaction ID", "Unit ID", "Blood type", "Component", "Method", "Status", "Operator staff ID", "Operator", "Classification", "Blockchain ID"],
+    rows: visibleHistory.map((item) => [item.recordedAt || item.ts, item.direction, item.scanId, item.txId, item.isbt, item.type, item.comp, item.method, item.status, item.operatorStaffId, item.operatorName, item.operatorClassification, item.blockchainId || item.ledgerId]),
+    filename: inboundOnly ? "blood-unit-receipts" : "blood-unit-transactions",
+  });
+
   return (
     <div className="page transaction-hub-page">
       <PageHead
@@ -701,11 +725,10 @@ function ScannerPage({
             : "Launch the mobile scanner to record inbound and outbound blood unit transactions."
         }
         actions={
-          permissions.canViewInventory ? (
-            <Btn size="sm" kind="ghost" onClick={() => onNav("inventory")}>
-              View Inventory
-            </Btn>
-          ) : null
+          <div className="export-button-group">
+            {permissions.canExportTransactions && <Btn size="sm" icon="download" onClick={exportTransactions}>Export CSV</Btn>}
+            {permissions.canViewInventory && <Btn size="sm" kind="ghost" onClick={() => onNav("inventory")}>View Inventory</Btn>}
+          </div>
         }
       />
 
@@ -759,6 +782,7 @@ function ScannerPage({
             </div>
 
             <div className="mobile-phone-body">
+              <OperatorSelector compact hospital={hospital} staffDirectory={staffDirectory} dutySchedules={dutySchedules} operatorId={operatorId} onOperatorChange={onOperatorChange} />
               {!isOnline && (
                 <div className="scanner-offline-banner">
                   <I name="warn" size={16} />

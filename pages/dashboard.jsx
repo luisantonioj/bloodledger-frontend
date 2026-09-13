@@ -181,7 +181,7 @@ function DashboardPage({ hospital, permissions, transfers, onNav, onAct }) {
             <span><i className="surplus" />Available to redistribute</span>
           </div>
 
-          <div className="inventory-chart" aria-label="Blood inventory bar chart">
+          <div className="inventory-chart blood-inventory-overview-chart" aria-label="Blood inventory bar chart">
             <div className="inventory-chart-y-title">Quantity</div>
 
             <div className="inventory-chart-y-axis" aria-hidden="true">

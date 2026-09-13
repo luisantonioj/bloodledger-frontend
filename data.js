@@ -74,23 +74,7 @@ window.HOSPITALS = [
 
 window.INSTITUTION_ROLES = {
   "MMC-LIP": [
-    {
-      id: "Medical Technologist",
-      label: "Medical Technologist",
-      sub: "Manage blood unit intake and inventory records.",
-    },
-
-    {
-      id: "Blood Bank Head",
-      label: "Blood Bank Head",
-      sub: "Oversee inventory, requests, transfers, and compliance records.",
-    },
-
-    {
-      id: "System Administrator",
-      label: "System Administrator",
-      sub: "Manage system-level access and configuration.",
-    },
+    { id: "Blood Bank Facility Account", label: "Blood Bank Facility Account", sub: "Shared facility access with transaction-level staff attribution." },
   ],
 
   "PRC-LIP": [
@@ -102,57 +86,15 @@ window.INSTITUTION_ROLES = {
   ],
 
   "LMC-LIP": [
-    {
-      id: "Medical Technologist",
-      label: "Medical Technologist",
-      sub: "Review blood availability and handle blood-related records.",
-    },
-
-    {
-      id: "Authorized Requester",
-      label: "Authorized Requester",
-      sub: "Create and monitor blood requests and transfers.",
-    },
+    { id: "Requestor Facility Account", label: "Requestor Facility Account", sub: "Shared request and inbound-receipt access with staff attribution." },
   ],
 
   "MDH-LIP": [
-    {
-      id: "Medical Technologist",
-      label: "Medical Technologist",
-      sub: "Review blood availability and handle blood-related records.",
-    },
-
-    {
-      id: "Authorized Requester",
-      label: "Authorized Requester",
-      sub: "Create and monitor blood requests and transfers.",
-    },
-
-    {
-      id: "Blood Bank Head",
-      label: "Blood Bank Head",
-      sub: "Approve requests and authorize blood-unit redistribution.",
-    },
+    { id: "Blood Bank Facility Account", label: "Blood Bank Facility Account", sub: "Shared facility access with transaction-level staff attribution." },
   ],
 
   "CLH-LIP": [
-    {
-      id: "Medical Technologist",
-      label: "Medical Technologist",
-      sub: "Review blood availability and handle blood-related records.",
-    },
-
-    {
-      id: "Authorized Requester",
-      label: "Authorized Requester",
-      sub: "Create and monitor blood requests and transfers.",
-    },
-
-    {
-      id: "Blood Bank Head",
-      label: "Blood Bank Head",
-      sub: "Approve requests and authorize blood-unit redistribution.",
-    },
+    { id: "Blood Bank Facility Account", label: "Blood Bank Facility Account", sub: "Shared facility access with transaction-level staff attribution." },
   ],
 
   "DOH-CHD": [
@@ -1135,47 +1077,132 @@ window.CONSORTIUM_COMPONENT_FACTORS = {
 // passwords must be managed by the authentication service, never client data.
 
 window.MOCK_ACCOUNTS = [
-  { email: "m.santos@mmc.bloodledger", password: "BloodLedger2026!", name: "M. Santos, RMT", initials: "MS", hospital: "MMC-LIP", role: "Medical Technologist" },
-  { email: "r.reyes@mmc.bloodledger", password: "BloodLedger2026!", name: "Dr. R. Reyes", initials: "RR", hospital: "MMC-LIP", role: "Blood Bank Head" },
-  { email: "a.garcia@mmc.bloodledger", password: "BloodLedger2026!", name: "A. Garcia", initials: "AG", hospital: "MMC-LIP", role: "System Administrator" },
-
+  { email: "bloodbank@mmc.bloodledger", password: "BloodLedger2026!", name: "Mary Mediatrix Blood Bank", initials: "MM", hospital: "MMC-LIP", role: "Blood Bank Facility Account", scope: "blood_bank", status: "Active" },
+  { email: "bloodbank@medix.bloodledger", password: "BloodLedger2026!", name: "Lipa Medix Blood Bank", initials: "LM", hospital: "MDH-LIP", role: "Blood Bank Facility Account", scope: "blood_bank", status: "Active" },
+  { email: "bloodbank@nlvilla.bloodledger", password: "BloodLedger2026!", name: "N.L. Villa Blood Bank", initials: "NV", hospital: "CLH-LIP", role: "Blood Bank Facility Account", scope: "blood_bank", status: "Active" },
+  { email: "facility@metrolipa.bloodledger", password: "BloodLedger2026!", name: "Metro Lipa Medical Center", initials: "ML", hospital: "LMC-LIP", role: "Requestor Facility Account", scope: "requestor", status: "Active" },
   { email: "l.mendoza@prc.bloodledger", password: "BloodLedger2026!", name: "L. Mendoza", initials: "LM", hospital: "PRC-LIP", role: "PRC Administrator" },
-
-  { email: "j.ramos@metrolipa.bloodledger", password: "BloodLedger2026!", name: "J. Ramos, RMT", initials: "JR", hospital: "LMC-LIP", role: "Medical Technologist" },
-  { email: "c.tan@metrolipa.bloodledger", password: "BloodLedger2026!", name: "C. Tan", initials: "CT", hospital: "LMC-LIP", role: "Authorized Requester" },
-
-  { email: "a.lim@medix.bloodledger", password: "BloodLedger2026!", name: "A. Lim, RMT", initials: "AL", hospital: "MDH-LIP", role: "Medical Technologist" },
-  { email: "s.bautista@medix.bloodledger", password: "BloodLedger2026!", name: "S. Bautista", initials: "SB", hospital: "MDH-LIP", role: "Authorized Requester" },
-  { email: "m.delacruz@medix.bloodledger", password: "BloodLedger2026!", name: "Dr. M. Dela Cruz", initials: "MD", hospital: "MDH-LIP", role: "Blood Bank Head" },
-
-  { email: "d.flores@nlvilla.bloodledger", password: "BloodLedger2026!", name: "D. Flores, RMT", initials: "DF", hospital: "CLH-LIP", role: "Medical Technologist" },
-  { email: "n.aquino@nlvilla.bloodledger", password: "BloodLedger2026!", name: "N. Aquino", initials: "NA", hospital: "CLH-LIP", role: "Authorized Requester" },
-  { email: "p.hernandez@nlvilla.bloodledger", password: "BloodLedger2026!", name: "Dr. P. Hernandez", initials: "PH", hospital: "CLH-LIP", role: "Blood Bank Head" },
-
   { email: "regional.officer@doh.bloodledger", password: "BloodLedger2026!", name: "DOH Calabarzon Officer", initials: "DO", hospital: "DOH-CHD", role: "DOH Regulatory Officer" },
 ];
 
 // Approved profile details mirror the fields collected in the institutional
 // application. These are prototype records and not authoritative credentials.
 window.USER_PROFILE_DETAILS = {
-  "r.reyes@mmc.bloodledger": { employeeId: "MMC-BBH-0042", position: "Blood Bank Head", phone: "+63 917 555 0142", professionalLicense: "PRC-MD-0084217", applicationId: "APP-2026-0142", submitted: "2026-07-10 09:16", approvedAt: "2026-07-15 10:30", approvedBy: "PRC System Administration", status: "Active", lastSignIn: "2026-08-11 09:42" },
-  "m.santos@mmc.bloodledger": { employeeId: "MMC-MT-0187", position: "Medical Technologist", phone: "+63 917 555 0187", professionalLicense: "PRC-MT-0063187", applicationId: "APP-2026-0142", approvedAt: "2026-07-15 10:30", status: "Active" },
-  "a.garcia@mmc.bloodledger": { employeeId: "MMC-IT-0031", position: "System Administrator", phone: "+63 917 555 0031", applicationId: "APP-2026-0142", approvedAt: "2026-07-15 10:30", status: "Active" },
+  "bloodbank@mmc.bloodledger": { applicationId: "APP-2026-0142", submitted: "2026-07-10 09:16", approvedAt: "2026-07-15 10:30", approvedBy: "PRC System Administration", status: "Active", lastSignIn: "2026-09-13 09:42" },
+  "bloodbank@medix.bloodledger": { applicationId: "APP-2026-0178", submitted: "2026-07-28 09:20", approvedAt: "2026-08-04 09:35", approvedBy: "PRC System Administration", status: "Active" },
+  "bloodbank@nlvilla.bloodledger": { applicationId: "APP-2026-0177", submitted: "2026-07-27 14:05", approvedAt: "2026-08-03 11:05", approvedBy: "PRC System Administration", status: "Active" },
+  "facility@metrolipa.bloodledger": { applicationId: "APP-2026-0179", submitted: "2026-07-28 13:20", approvedAt: "2026-08-04 10:12", approvedBy: "PRC System Administration", status: "Active" },
   "l.mendoza@prc.bloodledger": { employeeId: "PRC-LIP-0007", position: "PRC System Administrator", phone: "+63 917 555 0007", applicationId: "PRC-SYS-2026-001", approvedAt: "2026-07-01 08:00", status: "Active" },
-  "j.ramos@metrolipa.bloodledger": { employeeId: "LMC-MT-0284", position: "Medical Technologist", phone: "+63 917 555 0284", professionalLicense: "PRC-MT-0059284", applicationId: "APP-2026-0179", submitted: "2026-07-28 13:20", approvedAt: "2026-08-04 10:12", approvedBy: "L. Mendoza", status: "Active" },
-  "c.tan@metrolipa.bloodledger": { employeeId: "LMC-AR-0116", position: "Authorized Requester", phone: "+63 917 555 0116", applicationId: "APP-2026-0179", approvedAt: "2026-08-04 10:12", status: "Active" },
-  "a.lim@medix.bloodledger": { employeeId: "MDH-MT-0192", position: "Medical Technologist", phone: "+63 917 555 0192", professionalLicense: "PRC-MT-0057192", applicationId: "APP-2026-0178", approvedAt: "2026-08-04 09:35", status: "Active" },
-  "s.bautista@medix.bloodledger": { employeeId: "MDH-AR-0088", position: "Authorized Requester", phone: "+63 917 555 0088", applicationId: "APP-2026-0178", approvedAt: "2026-08-04 09:35", status: "Active" },
-  "m.delacruz@medix.bloodledger": { employeeId: "MDH-BBH-0025", position: "Blood Bank Head", phone: "+63 917 555 0025", professionalLicense: "PRC-MD-0074025", applicationId: "APP-2026-0178", approvedAt: "2026-08-04 09:35", status: "Active" },
-  "d.flores@nlvilla.bloodledger": { employeeId: "CLH-MT-0127", position: "Medical Technologist", phone: "+63 917 555 0127", professionalLicense: "PRC-MT-0048127", applicationId: "APP-2026-0177", approvedAt: "2026-08-03 11:05", status: "Active" },
-  "n.aquino@nlvilla.bloodledger": { employeeId: "CLH-AR-0064", position: "Authorized Requester", phone: "+63 917 555 0064", applicationId: "APP-2026-0177", approvedAt: "2026-08-03 11:05", status: "Active" },
-  "p.hernandez@nlvilla.bloodledger": { employeeId: "CLH-BBH-0019", position: "Blood Bank Head", phone: "+63 917 555 0019", professionalLicense: "PRC-MD-0068019", applicationId: "APP-2026-0177", approvedAt: "2026-08-03 11:05", status: "Active" },
   "regional.officer@doh.bloodledger": { employeeId: "DOH-CHD-021", position: "Regional Regulatory Officer", phone: "+63 917 555 0021", applicationId: "DOH-SYS-2026-001", approvedAt: "2026-07-01 08:00", status: "Active" },
 };
 
+// Facility accounts authenticate the institution. Individual staff members are
+// selected at the point of each mutable action so the ledger retains human
+// attribution without requiring staff to repeatedly sign in and out.
+window.STAFF_DIRECTORY = {
+  "MMC-LIP": [
+    { staffId: "MMC-BBH-0042", name: "Dr. R. Reyes", initials: "RR", classification: "Blood Bank Head", status: "Active", professionalLicense: "PRC-MD-0084217", phone: "+63 917 555 0142", adminPin: "4826" },
+    { staffId: "MMC-BBS-0187", name: "M. Santos, RMT", initials: "MS", classification: "Blood Bank Staff", status: "Active", professionalLicense: "PRC-MT-0063187", phone: "+63 917 555 0187" },
+  ],
+  "MDH-LIP": [
+    { staffId: "MDH-BBH-0025", name: "Dr. M. Dela Cruz", initials: "MD", classification: "Blood Bank Head", status: "Active", professionalLicense: "PRC-MD-0074025", phone: "+63 917 555 0025", adminPin: "2649" },
+    { staffId: "MDH-BBS-0192", name: "A. Lim, RMT", initials: "AL", classification: "Blood Bank Staff", status: "Active", professionalLicense: "PRC-MT-0057192", phone: "+63 917 555 0192" },
+    { staffId: "MDH-BBS-0193", name: "S. Bautista", initials: "SB", classification: "Blood Bank Staff", status: "Active", phone: "+63 917 555 0193" },
+  ],
+  "CLH-LIP": [
+    { staffId: "CLH-BBH-0019", name: "Dr. P. Hernandez", initials: "PH", classification: "Blood Bank Head", status: "Active", professionalLicense: "PRC-MD-0068019", phone: "+63 917 555 0019", adminPin: "8153" },
+    { staffId: "CLH-BBS-0127", name: "D. Flores, RMT", initials: "DF", classification: "Blood Bank Staff", status: "Active", professionalLicense: "PRC-MT-0048127", phone: "+63 917 555 0127" },
+    { staffId: "CLH-BBS-0128", name: "N. Aquino", initials: "NA", classification: "Blood Bank Staff", status: "Active", phone: "+63 917 555 0128" },
+  ],
+  "LMC-LIP": [
+    { staffId: "LMC-FA-0116", name: "C. Tan", initials: "CT", classification: "Facility Administrator", status: "Active", phone: "+63 917 555 0116", adminPin: "7315" },
+    { staffId: "LMC-RS-0284", name: "J. Ramos, RMT", initials: "JR", classification: "Requestor Staff", status: "Active", professionalLicense: "PRC-MT-0059284", phone: "+63 917 555 0284" },
+  ],
+};
+
+(function seedDutySchedules() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const day = `${yyyy}-${mm}-${dd}`;
+  window.DUTY_SCHEDULES = {
+    "MMC-LIP": [
+      { staff_id: "MMC-BBS-0187", staff_name: "M. Santos, RMT", shift_start: `${day} 00:00`, shift_end: `${day} 23:59`, assignment: "Primary" },
+      { staff_id: "MMC-BBH-0042", staff_name: "Dr. R. Reyes", shift_start: `${day} 00:00`, shift_end: `${day} 23:59`, assignment: "Supporting" },
+    ],
+    "MDH-LIP": [
+      { staff_id: "MDH-BBS-0192", staff_name: "A. Lim, RMT", shift_start: `${day} 00:00`, shift_end: `${day} 23:59`, assignment: "Primary" },
+      { staff_id: "MDH-BBH-0025", staff_name: "Dr. M. Dela Cruz", shift_start: `${day} 00:00`, shift_end: `${day} 23:59`, assignment: "Supporting" },
+    ],
+    "CLH-LIP": [
+      { staff_id: "CLH-BBS-0127", staff_name: "D. Flores, RMT", shift_start: `${day} 00:00`, shift_end: `${day} 23:59`, assignment: "Primary" },
+      { staff_id: "CLH-BBH-0019", staff_name: "Dr. P. Hernandez", shift_start: `${day} 00:00`, shift_end: `${day} 23:59`, assignment: "Supporting" },
+    ],
+    "LMC-LIP": [
+      { staff_id: "LMC-RS-0284", staff_name: "J. Ramos, RMT", shift_start: `${day} 00:00`, shift_end: `${day} 23:59`, assignment: "Primary" },
+      { staff_id: "LMC-FA-0116", staff_name: "C. Tan", shift_start: `${day} 00:00`, shift_end: `${day} 23:59`, assignment: "Supporting" },
+    ],
+  };
+})();
+
+// Synthetic, non-clinical aggregate history used only to demonstrate the
+// future analytics API contract. Confirmed-use values intentionally remain null.
+(function seedAnalyticsFixtures() {
+  const facilities = ["MMC-LIP", "MDH-LIP", "CLH-LIP"];
+  const departments = ["Emergency Department", "Operating Room", "Obstetrics", "Internal Medicine", "Unknown department"];
+  const bloodTypes = ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"];
+  const components = ["PRBC", "Platelets", "FFP"];
+  const demand = [];
+  for (let year = 2024; year <= 2026; year += 1) {
+    for (let month = 1; month <= 12; month += 1) {
+      if (year === 2026 && month > 9) continue;
+      facilities.forEach((facilityId, facilityIndex) => {
+        bloodTypes.forEach((bloodType, bloodIndex) => {
+          const component = components[(month + bloodIndex) % components.length];
+          const requestCount = 2 + ((month + bloodIndex + facilityIndex) % 6);
+          demand.push({
+            facilityId,
+            month: `${year}-${String(month).padStart(2, "0")}`,
+            department: departments[(month + bloodIndex + facilityIndex) % departments.length],
+            requestingFacilityId: ["LMC-LIP", "MMC-LIP", "MDH-LIP", "CLH-LIP"][(month + facilityIndex) % 4],
+            bloodType,
+            component,
+            requestCount,
+            unitsRequested: requestCount + 1 + ((month + bloodIndex) % 4),
+            confirmedUnitsUsed: null,
+            complete: !(year === 2026 && month === 9),
+          });
+        });
+      });
+    }
+  }
+  window.ANALYTICS_DEMAND = demand;
+  window.ANALYTICS_ASSESSMENTS = facilities.flatMap((facilityId, facilityIndex) =>
+    bloodTypes.slice(0, 6).map((bloodType, index) => ({
+      facilityId,
+      bloodType,
+      component: components[index % components.length],
+      eligibleUnreservedStock: 7 + ((index + facilityIndex) % 9),
+      expectedDemand: 5 + ((index * 2 + facilityIndex) % 8),
+      forecastHorizon: "14 days",
+      uncertainty: `${12 + index * 2}%`,
+      safetyAllowance: 2,
+      minimumReserve: 4,
+      estimatedSurplus: index % 3 === 0 ? null : Math.max(0, 2 + ((index + facilityIndex) % 4)),
+      status: index % 3 === 0 ? "Assessment unavailable" : (index % 2 ? "Retain locally" : "Review candidate"),
+      explanation: index % 3 === 0 ? "Required policy input is not approved." : "Backend-shaped simulation based on synthetic demand and an approved mock reserve value.",
+      generatedAt: "2026-09-13 06:00",
+      freshness: index === 5 ? "Stale" : "Current",
+      simulation: true,
+    }))
+  );
+  window.ANALYTICS_META = { coverageStart: "2024-01-01", coverageEnd: "2026-09-30", completeness: "98.6% synthetic coverage", lastSuccessfulUpdate: "2026-09-13 06:00", simulation: true };
+})();
+
 window.FACILITY_PROFILES = {
   "MMC-LIP": { legalName: "Mary Mediatrix Medical Center", participationType: "Blood Bank", facilityLevel: "Level 3 Hospital", ownership: "Private", address: "Lipa City, Batangas", facilityEmail: "bloodbank@mmc.bloodledger", phone: "+63 (43) 000 0142", hospitalLto: "DOH-HF-LTO-MMC-2026", bloodServiceLicense: "DOH-BSF-MMC-2026", bloodServiceCategory: "Blood Bank", referralFacility: "PRC Lipa City Chapter", documents: [{ name: "Hospital LTO.pdf", category: "Hospital / Health Facility LTO" }, { name: "Blood Service Facility License.pdf", category: "DOH BSF LTO" }, { name: "Facility Assessment.pdf", category: "Assessment and capability documents" }] },
-  "LMC-LIP": { legalName: "Metro Lipa Medical Center", participationType: "Requestor", facilityLevel: "Level 2 Hospital", ownership: "Private", address: "Lipa City, Batangas", facilityEmail: "transfusion@metrolipa.bloodledger", phone: "+63 (43) 000 0179", hospitalLto: "DOH-HF-LTO-LMC-2026", bloodServiceLicense: "DOH-BS-ATO-LMC-2026", referralFacility: "Mary Mediatrix Medical Center", documents: [{ name: "Hospital LTO.pdf", category: "Hospital / Health Facility LTO" }, { name: "Blood Station Authorization.pdf", category: "Blood Station authority" }] },
+  "LMC-LIP": { legalName: "Metro Lipa Medical Center", participationType: "Requestor", facilityLevel: "Level 2 Hospital", ownership: "Private", address: "Lipa City, Batangas", facilityEmail: "facility@metrolipa.bloodledger", phone: "+63 (43) 000 0179", hospitalLto: "DOH-HF-LTO-LMC-2026", bloodServiceLicense: "DOH-BS-ATO-LMC-2026", referralFacility: "Mary Mediatrix Medical Center", documents: [{ name: "Hospital LTO.pdf", category: "Hospital / Health Facility LTO" }, { name: "Blood Station Authorization.pdf", category: "Blood Station authority" }] },
   "MDH-LIP": { legalName: "Lipa Medix Medical Center", participationType: "Blood Bank", facilityLevel: "Level 2 Hospital", ownership: "Private", address: "Lipa City, Batangas", facilityEmail: "bloodbank@medix.bloodledger", phone: "+63 (43) 000 0178", hospitalLto: "DOH-HF-LTO-MDH-2026", bloodServiceLicense: "DOH-BSF-MDH-2026", bloodServiceCategory: "Blood Bank", referralFacility: "PRC Lipa City Chapter" },
   "CLH-LIP": { legalName: "N.L. Villa Memorial Medical Center", participationType: "Blood Bank", facilityLevel: "Level 2 Hospital", ownership: "Private", address: "Lipa City, Batangas", facilityEmail: "bloodbank@nlvilla.bloodledger", phone: "+63 (43) 000 0177", hospitalLto: "DOH-HF-LTO-CLH-2026", bloodServiceLicense: "DOH-BSF-CLH-2026", bloodServiceCategory: "Blood Bank", referralFacility: "PRC Lipa City Chapter" },
   "PRC-LIP": { legalName: "Philippine Red Cross - Lipa City Chapter", participationType: "Network Supply Partner", facilityLevel: "Red Cross Chapter", ownership: "Non-government humanitarian organization", address: "Lipa City, Batangas", facilityEmail: "bloodservices@prc.bloodledger", phone: "+63 (43) 000 0101", hospitalLto: "Not applicable", bloodServiceLicense: "PRC-BS-LIPA-2026", bloodServiceCategory: "Blood Center" },
@@ -1235,35 +1262,32 @@ window.ADMIN_ACTIVITY = [
 window.PENDING_ACCOUNTS = [
   {
     id: "APP-2026-0184",
-    name: "K. Villanueva, RMT",
-    email: "k.villanueva@metrolipa.example",
-    employee_id: "LMC-2841",
-    hospital: "LMC-LIP",
-    role: "Medical Technologist",
-    applicant_type: "Requestor",
-    submitted: "2026-08-04 09:18",
+    name: "Dr. E. Navarro",
+    email: "bloodbank@stpatrick.bloodledger",
+    employee_id: "SPH-BBH-001",
+    hospital: null,
+    institution_name: "St. Patrick's Hospital Medical Center",
+    role: "Blood Bank Facility Account",
+    applicant_classification: "Blood Bank Head",
+    applicant_type: "Blood Bank",
+    submitted: "2026-09-11 09:18",
     status: "Pending Review",
+    facility: { facilityLevel: "Level 2 Hospital", ownership: "Private", address: "Lipa City", city: "Lipa City", province: "Batangas", hospitalLto: "DOH-HF-LTO-SPH-2026", hospitalLtoExpiry: "2027-09-01", bloodServiceLicense: "DOH-BSF-SPH-2026", bloodServiceExpiry: "2027-09-01", headName: "Dr. E. Navarro", headLicense: "PRC-MD-0088112", medtechName: "K. Villanueva, RMT", medtechLicense: "PRC-MT-0072331", phone: "+63 917 555 0184" },
+    documents: [{ category: "hospitalLto", name: "Hospital LTO.pdf" }, { category: "bloodServiceLicense", name: "BSF License.pdf" }],
   },
   {
     id: "APP-2026-0183",
-    name: "E. Navarro",
-    email: "e.navarro@medix.example",
-    employee_id: "MDH-1906",
-    hospital: "MDH-LIP",
-    role: "Authorized Requester",
+    name: "R. Castillo",
+    email: "facility@communitylipa.bloodledger",
+    employee_id: "CLC-FA-001",
+    hospital: null,
+    institution_name: "Community Lipa Care Hospital",
+    role: "Requestor Facility Account",
+    applicant_classification: "Facility Administrator",
     applicant_type: "Requestor",
-    submitted: "2026-08-04 08:42",
+    submitted: "2026-09-10 14:42",
     status: "Pending Review",
-  },
-  {
-    id: "APP-2026-0182",
-    name: "L. Castillo, RMT",
-    email: "l.castillo@mmc.example",
-    employee_id: "MMC-3317",
-    hospital: "MMC-LIP",
-    role: "Medical Technologist",
-    applicant_type: "Blood Bank",
-    submitted: "2026-08-03 16:05",
-    status: "Pending Review",
+    facility: { facilityLevel: "Level 1 Hospital", ownership: "Private", address: "Lipa City", city: "Lipa City", province: "Batangas", hospitalLto: "DOH-HF-LTO-CLC-2026", hospitalLtoExpiry: "2027-08-31", bloodServiceLicense: "DOH-BS-ATO-CLC-2026", bloodServiceExpiry: "2027-08-31", medtechName: "J. Villareal, RMT", medtechLicense: "PRC-MT-0065119", phone: "+63 917 555 0183" },
+    documents: [{ category: "hospitalLto", name: "Hospital LTO.pdf" }, { category: "authorization", name: "Blood Station Authorization.pdf" }],
   },
 ];

@@ -71,16 +71,16 @@ function App() {
 
       user: {
         name:
-          "Dr. R. Reyes",
+          "Mary Mediatrix Blood Bank",
 
         initials:
-          "RR",
+          "MM",
 
         role:
-          "BLOOD BANK HEAD",
+          "BLOOD BANK FACILITY ACCOUNT",
 
         username:
-          "r.reyes@mmc.bloodledger",
+          "bloodbank@mmc.bloodledger",
       },
     });
 
@@ -161,11 +161,21 @@ function App() {
       []
     );
 
+  const [staffDirectory, setStaffDirectory] = React.useState(window.STAFF_DIRECTORY || {});
+  const [dutySchedules, setDutySchedules] = React.useState(window.DUTY_SCHEDULES || {});
+  const [operatorByFacility, setOperatorByFacility] = React.useState(() => {
+    const duty = currentDutyForFacility("MMC-LIP", window.DUTY_SCHEDULES || {});
+    return duty.primary ? { "MMC-LIP": duty.primary.staff_id } : {};
+  });
+
 
   const permissions =
     buildPermissions(
       session
     );
+
+  const currentOperatorId = operatorByFacility[session?.hospital?.id] || "";
+  const currentOperator = operatorById(session?.hospital?.id, currentOperatorId, staffDirectory);
 
 
   const toast =
@@ -234,6 +244,11 @@ function App() {
             "This account does not have permission to create blood requests or transfers.",
         });
 
+        return;
+      }
+
+      if (!currentOperator) {
+        toast.push({ kind: "warn", text: "Transaction operator required", sub: "Select an Active staff member before creating a ledger-changing record." });
         return;
       }
 
@@ -337,6 +352,8 @@ function App() {
 
         requestOnly:
           !!payload.requestOnly,
+
+        ...transactionAttribution(session.hospital?.id, currentOperator, payload.requestOnly ? "Blood request submitted" : "Transfer created"),
       };
 
 
@@ -431,6 +448,48 @@ function App() {
       window.AUDIT = nextRows;
     };
 
+  const handleStaffDirectoryChange = (nextDirectory) => {
+    setStaffDirectory(nextDirectory);
+    window.STAFF_DIRECTORY = nextDirectory;
+    const selected = nextDirectory?.[session?.hospital?.id]?.find((staff) => staff.staffId === currentOperatorId);
+    if (selected && selected.status !== "Active") {
+      setOperatorByFacility((current) => ({ ...current, [session.hospital.id]: "" }));
+    }
+  };
+
+  const handleDutySchedulesChange = (nextSchedules) => {
+    setDutySchedules(nextSchedules);
+    window.DUTY_SCHEDULES = nextSchedules;
+    const duty = currentDutyForFacility(session?.hospital?.id, nextSchedules);
+    if (duty.primary) setOperatorByFacility((current) => ({ ...current, [session.hospital.id]: duty.primary.staff_id }));
+  };
+
+  const handleOperatorChange = (staffId, reason, scheduledStaffId, shiftEnd) => {
+    const previous = operatorById(session?.hospital?.id, currentOperatorId || scheduledStaffId, staffDirectory);
+    const replacement = operatorById(session?.hospital?.id, staffId, staffDirectory);
+    if (!replacement) return;
+    setOperatorByFacility((current) => ({ ...current, [session.hospital.id]: staffId }));
+    if (previous && previous.staffId !== replacement.staffId) {
+      const event = {
+        timestamp: new Date().toISOString().slice(0, 19).replace("T", " "),
+        activity: "Transaction operator overridden",
+        type: "Transaction operator overridden",
+        user: replacement.name,
+        source: replacement.name,
+        facilityId: session.hospital.id,
+        operatorStaffId: replacement.staffId,
+        operatorName: replacement.name,
+        operatorClassification: replacement.classification,
+        reference: replacement.staffId,
+        details: `${previous.name} replaced by ${replacement.name}. Reason: ${reason}.${shiftEnd ? ` Override valid through ${shiftEnd}.` : ""}`,
+        status: "Recorded",
+        tx_hash: `0x${Math.random().toString(16).slice(2).padEnd(64, "0").slice(0, 64)}`,
+      };
+      handleAuditChange([event, ...auditRows]);
+      toast.push({ kind: "ok", text: "Transaction operator changed", sub: `${replacement.name} is selected for the remainder of this shift.` });
+    }
+  };
+
 
   const handleLogin =
     async (
@@ -445,6 +504,9 @@ function App() {
       setSession(
         next
       );
+
+      const duty = currentDutyForFacility(next.hospital?.id, dutySchedules);
+      setOperatorByFacility((current) => ({ ...current, [next.hospital?.id]: duty.primary?.staff_id || "" }));
 
       setAuthed(
         true
@@ -552,6 +614,25 @@ function App() {
 
     onUpdateAudit:
       handleAuditChange,
+
+    staffDirectory,
+
+    onUpdateStaffDirectory:
+      handleStaffDirectoryChange,
+
+    dutySchedules,
+
+    onUpdateDutySchedules:
+      handleDutySchedulesChange,
+
+    operatorId:
+      currentOperatorId,
+
+    operator:
+      currentOperator,
+
+    onOperatorChange:
+      handleOperatorChange,
   };
 
 
@@ -601,6 +682,16 @@ function App() {
     accounts: [
       "BloodLedger",
       "Account Administration",
+    ],
+
+    staff: [
+      "BloodLedger",
+      "Staff & Schedule",
+    ],
+
+    analytics: [
+      "BloodLedger",
+      "Analytics",
     ],
 
     profile: [
@@ -713,6 +804,30 @@ function App() {
   ) {
     PageBody = (
       <AccountsPage
+        {...pageProps}
+      />
+    );
+  }
+
+
+  else if (
+    page ===
+    "staff"
+  ) {
+    PageBody = (
+      <StaffSchedulePage
+        {...pageProps}
+      />
+    );
+  }
+
+
+  else if (
+    page ===
+    "analytics"
+  ) {
+    PageBody = (
+      <AnalyticsPage
         {...pageProps}
       />
     );

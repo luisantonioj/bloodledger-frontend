@@ -6,7 +6,7 @@
 // surplus logic, and transfer assumptions can be reintroduced after
 // stakeholder requirements are confirmed.
 
-function InventoryPage({ hospital, permissions, filter, onNav }) {
+function InventoryPage({ hospital, permissions, filter, onNav, staffDirectory, dutySchedules, operatorId, operator, onOperatorChange, auditRows, onUpdateAudit }) {
   const [activeType, setActiveType] = React.useState(filter?.type || "ALL");
   const [comp, setComp] = React.useState("ALL");
   const [search, setSearch] = React.useState("");
@@ -26,6 +26,10 @@ function InventoryPage({ hospital, permissions, filter, onNav }) {
   );
 
   const importUnits = (units) => {
+    if (!operator) {
+      toast.push({ kind: "warn", text: "Transaction operator required", sub: "Select an Active staff member before importing blood units." });
+      return;
+    }
     if (hospital?.id === "MMC-LIP") {
       window.INVENTORY = [...(window.INVENTORY || []), ...units];
     } else {
@@ -36,6 +40,8 @@ function InventoryPage({ hospital, permissions, filter, onNav }) {
     }
     setInventoryVersion((version) => version + 1);
     setImportOpen(false);
+    const event = { ts: new Date().toISOString().slice(0, 19).replace("T", " "), actor: operator.name, role: operator.classification, facilityId: hospital?.id, operatorStaffId: operator.staffId, operatorName: operator.name, operatorClassification: operator.classification, action: "Blood inventory CSV imported", target: `${units.length} blood unit(s)`, status: "Recorded", blockchainId: transactionAttribution(hospital?.id, operator, "Blood inventory CSV imported").ledgerId, hospitalIds: [hospital?.id].filter(Boolean) };
+    onUpdateAudit?.([event, ...(auditRows || [])]);
     toast.push({
       kind: "ok",
       text: `${units.length} blood unit${units.length === 1 ? "" : "s"} imported`,
@@ -98,6 +104,15 @@ function InventoryPage({ hospital, permissions, filter, onNav }) {
     return (a.days_left || 9999) - (b.days_left || 9999);
   });
 
+  const exportInventory = () => exportCsvReport({
+    title: "Blood Inventory",
+    scope: `${hospital?.name} · authorized inventory`,
+    filters: { bloodType: activeType, component: comp, search: search || "None" },
+    headers: ["Unit ID", "Blood type", "Component", "Collection date", "Expiration date", "Days remaining", "Status", "Source"],
+    rows: filtered.map((unit) => [unit.isbt, unit.type, unit.comp, unit.collected, unit.expires, unit.days_left, unit.status, unit.source]),
+    filename: "blood-inventory",
+  });
+
   return (
     <div className="page">
       <PageHead
@@ -110,6 +125,9 @@ function InventoryPage({ hospital, permissions, filter, onNav }) {
         sub="View and manage the blood units currently recorded in the system."
         actions={
           <>
+            {permissions.canExportInventory && (
+              <Btn icon="download" onClick={exportInventory}>Export CSV</Btn>
+            )}
             {permissions.canScan && (
               <>
                 <Btn icon="upload" onClick={() => setImportOpen(true)}>
@@ -123,6 +141,10 @@ function InventoryPage({ hospital, permissions, filter, onNav }) {
           </>
         }
       />
+
+      {permissions.canScan && (
+        <OperatorSelector hospital={hospital} staffDirectory={staffDirectory} dutySchedules={dutySchedules} operatorId={operatorId} onOperatorChange={onOperatorChange} />
+      )}
 
       <div className="card">
         {/* Filters */}

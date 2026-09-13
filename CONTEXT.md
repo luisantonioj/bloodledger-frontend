@@ -10,16 +10,16 @@ BloodLedger's frontend exists to give every consortium member **one shared, real
 
 ## Target users
 
-The proposal defines a tiered stakeholder network. The frontend must serve all four, though not all with the same access level. The current prototype's default session represents the first row; the login page's role picker represents all four.
+The prototype uses organizational accounts rather than personal hospital logins. A Facility Account establishes the institution and its permissions; an Active operator selected during a mutable workflow establishes who performed the action. PRC and DOH retain separate organizational access.
 
 | Role | Institution type | What they need from the UI | Access level |
 |---|---|---|---|
-| **Medical Technologist** | Mary Mediatrix Medical Center (primary node) | Scan units in, initiate/dispatch/receive transfers, see the live matrix and alerts | Full operational access at their node |
-| **Blood Bank Head** | Mary Mediatrix Medical Center (primary node) | Everything a Med Technologist can do, plus approve/override/reconcile transfers, sign off with a PIN | Full operational + approval access |
+| **Blood-bank Facility Account** | Mary Mediatrix, Lipa Medix, or N.L. Villa | Inventory, inbound/outbound transactions, request processing, transfers, institution Analytics, exports, and staff attribution | Full operational access within its institution |
+| **Requestor Facility Account** | Metro Lipa or another approved non-blood-bank facility | View availability, submit and track requests, confirm inbound receipts, and export its own records | Request and inbound-receipt scope only |
 | **PRC Administrator** | Philippine Red Cross Lipa Chapter (system administrator and supply hub) | Review institutional applications, manage accounts, monitor blood-bank shortages, and coordinate replenishment | Consortium administration plus read-only supply coordination |
 | **Regulator (DOH)** | DOH-CHD Calabarzon | See which blood banks met required reporting checkpoints and review compliance exceptions | Read-only Dashboard, Alerts, and Compliance Reports; no operational inventory or write actions |
-| *(Participating blood banks — Lipa Medix Medical Center and N.L. Villa Memorial Medical Center)* | Consortium blood-bank institutions | Share approved stock availability, authorize requests, and track transfers | Access depends on the assigned institutional role |
-| *(Secondary requestors — Metro Lipa Medical Center and other approved facilities)* | Recipient institutions without a consortium blood bank | View redistributable availability, submit requests, and track receipt | Dashboard summary and request workflow; no inventory-write access |
+
+Blood-bank Staff Directories use the classifications **Blood Bank Head** and **Blood Bank Staff**. Requestor directories use **Facility Administrator** and **Requestor Staff**. These classifications govern administration and attribution but are not separate login accounts. Routine blood operations do not require Head approval or a Head PIN; administrative staff and schedule changes do.
 
 The login screen (`pages/login.jsx`) is the canonical reference for these four roles and their one-line descriptions — keep any future role-permission work consistent with that copy.
 
@@ -36,7 +36,8 @@ Each page in the app corresponds to functionality the research proposal specifie
 | **Scanner** | Mobile rear-camera or uploaded-photo OCR of the printed ISBT-128 donation serial → human review → inbound/outbound transaction record; offline entries are visibly buffered | FR-01, FR-13 |
 | **Consortium** | Cross-hospital inventory heatmap, network topology map (live vs. read-only links), peer/node health table | FR-03, stakeholder network |
 | **Audit** | Immutable, filterable ledger of every action (dispatch, receive, override, signature, sensor event) with hash/block/geo-signature detail | FR-10, FR-11, NFR-02 |
-| **Reporting** | Read-only KPI dashboard for DOH/PRC: consortium totals, distribution by chapter, completion rate by route, wastage, fulfillment time, donor consent compliance, ready-to-file DOH reports | Stakeholder read-only access, automated report generation objective |
+| **Analytics** | Authorized blood-bank demand history and PRC consortium comparisons, plus clearly marked simulation-only redistribution assessments | Forecasting objective; decision support only |
+| **Reporting** | Compliance checkpoints and role-scoped CSV exports from relevant operational modules | Stakeholder reporting access, automated report generation objective |
 
 BROA (Blood Recommendation & Optimization Agent, referred to in the UI copy) is the throughline across Dashboard, Alerts, and Transfers: it ranks candidate source hospitals by stock, distance, expiry/FEFO score, and produces the score shown as "BROA score" throughout. Requestors submit one request without choosing a hospital; the prototype assigns the strongest eligible source from current redistributable availability. The production recommendation remains a backend/chaincode responsibility.
 
@@ -71,8 +72,8 @@ BROA (Blood Recommendation & Optimization Agent, referred to in the UI copy) is 
 3. No operational write actions are available in either oversight flow; only PRC account and institutional-application administration is actionable.
 
 ### 5. Signing in
-1. User selects their hospital chapter and role on the login screen, enters username/PIN.
-2. On submit, session is set and the app renders the full authenticated shell (Sidebar + Topbar + page body).
+1. User signs in with the approved Facility Account, PRC account, or DOH account.
+2. On submit, the app renders navigation appropriate to the institution and authorized scope. Facility staff attribution is selected only when an action changes ledger state.
 
 ## Constraints (do not violate these when extending the UI)
 
@@ -86,5 +87,7 @@ These map directly to the proposal's Scopes and Limitations and Non-Functional R
 - **Transfer states must include exception paths.** Per panel feedback, transfers need pending/delayed/rejected/compromised states in addition to the happy path (Dispatched → In Transit → Received). The current prototype only implements the happy path in its status stepper — this is a known gap tracked in `tasks.md`, not a design decision to preserve.
 - **Dashboard data must read as "real-time."** NFR-06 requires inventory changes to reflect within 5 seconds of a scan event under normal conditions. This doesn't change frontend visuals, but it does mean any future data-fetching implementation needs to poll or subscribe frequently enough that the UI's "Live," pulsing dots, and "block 124,892"-style status indicators remain honest once real data is wired in.
 - **On-premise / Philippine Data Privacy Act compliance (NFR-07).** Not a frontend concern to render, but relevant if the frontend ever needs to describe data residency to a user (e.g. in the login screen's compliance footnote, which already references DOH Administrative Order 2008-0008 — keep this kind of regulatory copy accurate rather than inventing new claims).
-- **Four role tiers, not more.** Don't introduce additional roles beyond Medical Technologist, Hospital Admin (Blood Bank Head in the UI), DOH/PRC (read-only), and System Administrator (FR-12) without checking against the proposal.
+- **Institution identity and operator attribution are separate.** Hospitals use one Facility Account. Mutable events must retain facility ID plus the selected Active staff member's ID, name, classification at action time, timestamp, and audit/ledger identifier. Staff becoming Inactive must not rewrite history.
+- **Analytics is read-only decision support.** Access requires both eligible institution type and permission. Forecasts and surplus assessments are synthetic, backend-shaped fixtures and must remain visibly labeled as simulation-only—not authorization to redistribute.
+- **Exports follow the viewer's authorized scope.** Generate only the currently filtered records and never include credentials, PINs, patient information, diagnoses, treatments, clinical free text, private attachments, or another institution's unauthorized data.
 - **This is a proof-of-concept for one city consortium**, not a provincial/regional/national system. Avoid scope creep in copy or features (e.g. no multi-region switching, no non-Lipa hospitals) — the six-node consortium in `data.js` (`HOSPITALS`) is the intended scale for this phase.

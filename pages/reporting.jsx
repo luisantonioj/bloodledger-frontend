@@ -22,10 +22,16 @@ function ReportingPage({
   hospital,
   session,
   permissions,
+  staffDirectory,
+  dutySchedules,
+  operatorId,
+  operator,
+  onOperatorChange,
 }) {
-  const inventory = window.INVENTORY || [];
+  const inventory = permissions?.bloodBank ? facilityInventory(hospital) : window.INVENTORY || [];
   const bloodTypes = window.BLOOD_TYPES || [];
   const components = window.COMPONENTS || [];
+  const toast = React.useContext(ToastCtx);
 
   const isRegulator =
     permissions?.roleKey === "regulator";
@@ -228,6 +234,11 @@ function ReportingPage({
         return;
       }
 
+      if (!operator) {
+        toast.push({ kind: "warn", text: "Transaction operator required", sub: "Select an Active staff member before capturing a compliance checkpoint." });
+        return;
+      }
+
       if (
         checkpointExists
       ) {
@@ -287,8 +298,11 @@ function ReportingPage({
         capturedAt,
 
         capturedBy:
-          session?.user?.name ||
-          "Authorized User",
+          operator.name,
+
+        operatorStaffId: operator.staffId,
+
+        operatorClassification: operator.classification,
 
         status:
           "Pending Verification",
@@ -344,6 +358,11 @@ function ReportingPage({
         return;
       }
 
+      if (!operator) {
+        toast.push({ kind: "warn", text: "Transaction operator required", sub: "Select an Active staff member before verifying a compliance checkpoint." });
+        return;
+      }
+
 
       const now =
         new Date()
@@ -378,8 +397,13 @@ function ReportingPage({
                       now,
 
                     verifiedBy:
-                      session?.user?.name ||
-                      "Authorized User",
+                      operator.name,
+
+                    verifiedByStaffId:
+                      operator.staffId,
+
+                    verifiedByClassification:
+                      operator.classification,
                   }
                 : snapshot
           )
@@ -402,250 +426,17 @@ function ReportingPage({
       }
 
 
-      const rows =
-        [];
-
-
-      // -------------------------------------------------------
-      // Report metadata
-      // -------------------------------------------------------
-
-      rows.push([
-        "BloodLedger Compliance Report",
-      ]);
-
-      rows.push(
-        []
-      );
-
-
-      rows.push([
-        "Record ID",
-        snapshot.id,
-      ]);
-
-
-      rows.push([
-        "Facility",
-        snapshot.hospitalName,
-      ]);
-
-
-      rows.push([
-        "Date",
-        snapshot.date,
-      ]);
-
-
-      rows.push([
-        "Reporting Checkpoint",
-        snapshot.periodLabel,
-      ]);
-
-
-      rows.push([
-        "Captured At",
-        snapshot.capturedAt,
-      ]);
-
-
-      rows.push([
-        "Captured By",
-        snapshot.capturedBy,
-      ]);
-
-
-      rows.push([
-        "Status",
-        snapshot.status,
-      ]);
-
-
-      rows.push([
-        "Verified At",
-        snapshot.verifiedAt ||
-          "",
-      ]);
-
-
-      rows.push([
-        "Verified By",
-        snapshot.verifiedBy ||
-          "",
-      ]);
-
-
-      rows.push(
-        []
-      );
-
-
-      // -------------------------------------------------------
-      // Table header
-      // -------------------------------------------------------
-
-      rows.push([
-        "Blood Type",
-        ...components,
-        "Total",
-      ]);
-
-
-      // -------------------------------------------------------
-      // Blood inventory rows
-      // -------------------------------------------------------
-
-      snapshot.totals.forEach(
-        (
-          row
-        ) => {
-          const componentValues =
-            components.map(
-              (
-                component
-              ) =>
-                row.components[
-                  component
-                ] ||
-                0
-            );
-
-
-          const total =
-            componentValues.reduce(
-              (
-                sum,
-                value
-              ) =>
-                sum +
-                value,
-              0
-            );
-
-
-          rows.push([
-            row.type,
-            ...componentValues,
-            total,
-          ]);
-        }
-      );
-
-
-      // -------------------------------------------------------
-      // Convert to CSV
-      // -------------------------------------------------------
-
-      const csv =
-        rows
-          .map(
-            (
-              row
-            ) =>
-              row
-                .map(
-                  (
-                    value
-                  ) => {
-                    const text =
-                      String(
-                        value ??
-                        ""
-                      );
-
-
-                    return `"${text.replace(
-                      /"/g,
-                      '""'
-                    )}"`;
-                  }
-                )
-                .join(
-                  ","
-                )
-          )
-          .join(
-            "\n"
-          );
-
-
-      // Add UTF-8 BOM so spreadsheet software
-      // opens the file with proper encoding.
-      const csvContent =
-        "\uFEFF" +
-        csv;
-
-
-      const blob =
-        new Blob(
-          [
-            csvContent,
-          ],
-          {
-            type:
-              "text/csv;charset=utf-8;",
-          }
-        );
-
-
-      const url =
-        URL.createObjectURL(
-          blob
-        );
-
-
-      const link =
-        document.createElement(
-          "a"
-        );
-
-
-      const safeFacility =
-        String(
-          snapshot.hospitalName ||
-          "Hospital"
-        )
-          .replace(
-            /[^a-z0-9]/gi,
-            "_"
-          )
-          .replace(
-            /_+/g,
-            "_"
-          );
-
-
-      const safePeriod =
-        snapshot.period.replace(
-          ":",
-          ""
-        );
-
-
-      link.href =
-        url;
-
-
-      link.download =
-        `BloodLedger_Compliance_${safeFacility}_${snapshot.date}_${safePeriod}.csv`;
-
-
-      document.body.appendChild(
-        link
-      );
-
-
-      link.click();
-
-
-      document.body.removeChild(
-        link
-      );
-
-
-      URL.revokeObjectURL(
-        url
-      );
+      exportCsvReport({
+        title: "BloodLedger Compliance Report",
+        scope: snapshot.hospitalName,
+        filters: { date: snapshot.date, checkpoint: snapshot.periodLabel, status: snapshot.status },
+        headers: ["Blood Type", ...components, "Total", "Record ID", "Captured At", "Captured By", "Operator Staff ID", "Verified At", "Verified By"],
+        rows: snapshot.totals.map((row) => {
+          const values = components.map((component) => row.components[component] || 0);
+          return [row.type, ...values, values.reduce((sum, value) => sum + value, 0), snapshot.id, snapshot.capturedAt, snapshot.capturedBy, snapshot.operatorStaffId, snapshot.verifiedAt, snapshot.verifiedBy];
+        }),
+        filename: `bloodledger-compliance-${snapshot.date}-${snapshot.period.replace(":", "")}`,
+      });
     };
 
 
@@ -669,6 +460,8 @@ function ReportingPage({
         }
 
       />
+
+      {!isReadOnly && <OperatorSelector hospital={hospital} staffDirectory={staffDirectory} dutySchedules={dutySchedules} operatorId={operatorId} onOperatorChange={onOperatorChange} />}
 
 
       {/* =====================================================

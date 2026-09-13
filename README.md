@@ -6,7 +6,7 @@ The current codebase is a **high-fidelity mock/prototype**, not yet wired to any
 
 ## What BloodLedger is
 
-A permissioned consortium blockchain (Hyperledger Fabric) synchronizes blood inventory across Mary Mediatrix Medical Center (the sole primary blockchain node for this deployment phase), the Philippine Red Cross Lipa Chapter, other Lipa City hospitals (secondary/read-only nodes), and DOH-CHD Calabarzon (regulator, read-only). Barcode/QR IoT scanning removes manual data entry, a Blood Redistribution Optimization Algorithm (BROA) combines FEFO unit sequencing with Simple Additive Weighting across urgency/shortage/surplus/distance to recommend inter-hospital transfers, and a machine learning demand-forecasting microservice predicts daily consumption to compute a Predicted Distributable Surplus. This frontend is the role-based console used by Medical Technologists, Blood Bank Heads, the PRC Administrator, requestors, and DOH regulators.
+A permissioned consortium blockchain (Hyperledger Fabric) synchronizes blood inventory across participating Lipa City blood banks, requestor facilities, the Philippine Red Cross Lipa Chapter, and DOH-CHD Calabarzon. Facility Accounts identify each institution while operator attribution records the active staff member responsible for a mutable action. The prototype also demonstrates read-only historical-demand Analytics, simulation-only redistribution assessments, mobile OCR blood-unit capture, and role-scoped CSV reporting. All operational and analytical data remains synthetic until the backend, blockchain, and forecasting services are integrated.
 
 See `context.md` for target users, features, and flows; `design.md` for the visual system; `agents.md` for coding rules; `tasks.md` for the build plan.
 
@@ -64,6 +64,8 @@ bloodledger-frontend/
 │   ├── alerts.jsx             # Alert center (critical/low-cover/informational)
 │   ├── scanner.jsx             # Mobile OCR capture, inbound/outbound preview and transaction log
 │   ├── consortium.jsx          # Cross-hospital heatmap, network topology map, peer table
+│   ├── analytics.jsx           # Historical demand and simulation-only redistribution assessment
+│   ├── staff.jsx               # Facility staff directory and duty-schedule administration
 │   ├── audit.jsx                # Immutable ledger / audit trail viewer
 │   └── reporting.jsx             # Blood-bank checkpoint capture and compliance records
 ├── vendor/ocr/             # Pinned Tesseract browser runtime, worker, core, and English model
@@ -83,7 +85,7 @@ No install step is required.
    python3 -m http.server 5500
    ```
 2. Open the printed local URL in a browser.
-3. The app boots straight into the dashboard as **Dr. R. Reyes, Blood Bank Head, Mary Mediatrix Medical Center** (see `app.jsx`'s initial `session` state). Use the floating tweaks panel (bottom-right) → **Demo → Show login screen** to see the login page.
+3. The app boots straight into the dashboard using the **Mary Mediatrix Blood Bank Facility Account**. Staff responsibility is selected inside ledger-changing actions and defaults to the scheduled Primary operator. Use the floating tweaks panel (bottom-right) → **Demo → Show login screen** to see the login page.
 
 The mobile scanner is available from **Blood Unit Transactions**. The desktop page is a transaction hub; **Open Mobile Scanner** opens the responsive phone simulation without changing the URL. Camera capture requires HTTPS on a phone, or `localhost` during development. **Try Demo Label** exercises the same local OCR worker without requesting camera permission.
 

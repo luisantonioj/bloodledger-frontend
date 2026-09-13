@@ -20,6 +20,11 @@ function TransfersPage({
   onUpdateAlerts,
   auditRows,
   onUpdateAudit,
+  staffDirectory,
+  dutySchedules,
+  operatorId,
+  operator,
+  onOperatorChange,
 }) {
   const transferList = transfers || window.TRANSFERS || [];
   const scopedTransferList = permissions.secondary || permissions.bloodBank
@@ -77,8 +82,6 @@ function TransfersPage({
   );
   const [selectedRequestId, setSelectedRequestId] = React.useState(null);
   const [decision, setDecision] = React.useState(null);
-  const [authMode, setAuthMode] = React.useState("Scan");
-  const [headId, setHeadId] = React.useState("");
   const [movementAction, setMovementAction] = React.useState(null);
 
   const [bloodType, setBloodType] = React.useState(
@@ -126,6 +129,13 @@ function TransfersPage({
   const [approvedCancellation, setApprovedCancellation] = React.useState(null);
   const [resolutionReason, setResolutionReason] = React.useState("");
   const [availableUnits, setAvailableUnits] = React.useState(1);
+
+  React.useEffect(() => {
+    if (operator) {
+      setRequesterName(operator.name);
+      setRequesterEmployeeId(operator.staffId);
+    }
+  }, [operator?.staffId]);
 
   React.useEffect(() => {
     if (prefill?.selectId) {
@@ -242,25 +252,16 @@ function TransfersPage({
 
   const openDecision = (nextDecision) => {
     setDecision(nextDecision);
-    setAuthMode("Scan");
-    setHeadId("");
   };
 
-  const simulateHeadIdScan = () => {
-    setHeadId(`BBH-${hospital?.id || "BANK"}-2026-0042`);
+  const ensureOperator = () => {
+    if (operator) return true;
+    toast.push({ kind: "warn", text: "Transaction operator required", sub: "Select an Active staff member before continuing." });
+    return false;
   };
 
   const confirmDecision = () => {
-    if (!selectedRequest || !permissions.canApprove) return;
-
-    if (!headId.trim()) {
-      toast.push({
-        kind: "warn",
-        text: "Blood Bank Head ID required",
-        sub: "Scan the authorized ID or enter it manually to continue.",
-      });
-      return;
-    }
+    if (!selectedRequest || !permissions.canProcessRequests || !ensureOperator()) return;
 
     const decidedAt = nowStamp();
     const decisionTxId = blockchainId();
@@ -269,7 +270,8 @@ function TransfersPage({
       onUpdateTransfers(
         replaceRecord(selectedRequest.id, {
           status: "Rejected",
-          rejectedBy: headId.trim(),
+          rejectedBy: operator.name,
+          rejectedByStaffId: operator.staffId,
           rejectedAt: decidedAt,
           decisionTxId,
         })
@@ -284,7 +286,8 @@ function TransfersPage({
       const approvedRequest = {
         ...selectedRequest,
         status: "Approved",
-        approvedBy: headId.trim(),
+        approvedBy: operator.name,
+        approvedByStaffId: operator.staffId,
         approvedAt: decidedAt,
         decisionTxId,
       };
@@ -309,7 +312,8 @@ function TransfersPage({
         pickupName: selectedRequest.pickupName,
         pickupIdReference: selectedRequest.pickupIdReference,
         attachments: selectedRequest.attachments || [],
-        approvedBy: headId.trim(),
+        approvedBy: operator.name,
+        approvedByStaffId: operator.staffId,
         approvedAt: decidedAt,
         approvalTxId: decisionTxId,
         completed: null,
@@ -331,12 +335,19 @@ function TransfersPage({
       });
     }
 
+    recordRequestEvent(
+      decision === "Reject" ? "Blood request declined" : "Blood request accepted",
+      selectedRequest,
+      "Recorded",
+      `${operator.name} (${operator.staffId}) recorded ${decision.toLowerCase()} for ${selectedRequest.id}.`,
+      [selectedRequest.from, selectedRequest.to]
+    );
+
     setDecision(null);
-    setHeadId("");
   };
 
   const confirmMovement = () => {
-    if (!selectedTransfer || !movementAction) return;
+    if (!selectedTransfer || !movementAction || !ensureOperator()) return;
 
     const actionAt = nowStamp();
     const actionTxId = blockchainId();
@@ -346,7 +357,8 @@ function TransfersPage({
         replaceRecord(selectedTransfer.id, {
           status: "In Transit",
           outboundAt: actionAt,
-          outboundBy: `${hospital?.short || "Blood bank"} scanner`,
+          outboundBy: operator.name,
+          outboundByStaffId: operator.staffId,
           outboundTxId: actionTxId,
         })
       );
@@ -362,7 +374,8 @@ function TransfersPage({
           status: "Received",
           receivedAt: actionAt,
           completed: actionAt,
-          receivedBy: `${hospital?.short || "Receiver"} scanner`,
+          receivedBy: operator.name,
+          receivedByStaffId: operator.staffId,
           receiptTxId: actionTxId,
         })
       );
@@ -373,6 +386,14 @@ function TransfersPage({
         sub: `Transfer marked Received · ${shortHash(actionTxId)}`,
       });
     }
+
+    recordRequestEvent(
+      movementAction === "Outbound" ? "Outbound custody recorded" : "Inbound receipt confirmed",
+      selectedTransfer,
+      "Recorded",
+      `${operator.name} (${operator.staffId}) recorded the ${movementAction.toLowerCase()} transaction.`,
+      [selectedTransfer.from, selectedTransfer.to]
+    );
 
     setMovementAction(null);
   };
@@ -399,6 +420,8 @@ function TransfersPage({
       });
       return;
     }
+
+    if (!ensureOperator()) return;
 
     const requiredDetails = [
       requesterName,
@@ -458,6 +481,9 @@ function TransfersPage({
       pickupName: pickupName.trim(),
       pickupIdReference: pickupIdReference.trim(),
       attachments: [requestFormFile, pickupDocumentFile],
+      operatorStaffId: operator.staffId,
+      operatorName: operator.name,
+      operatorClassification: operator.classification,
     };
 
     if (onCommit) {
@@ -488,7 +514,7 @@ function TransfersPage({
       : null;
 
   const submitPrcRequest = () => {
-    if (!canCreatePrcRequest) return;
+    if (!canCreatePrcRequest || !ensureOperator()) return;
 
     if (!prcNeededBy || Number(prcUnits) < 1) {
       toast.push({
@@ -506,7 +532,9 @@ function TransfersPage({
       units: Number(prcUnits),
       urgency: prcUrgency,
       neededBy: prcNeededBy,
-      requestedBy: session?.user?.name || "Blood Bank Head",
+      requestedBy: operator.name,
+      operatorStaffId: operator.staffId,
+      operatorClassification: operator.classification,
       requestedAt: nowStamp(),
       status: "Sent to PRC",
       prcReference: null,
@@ -533,8 +561,12 @@ function TransfersPage({
   const recordRequestEvent = (action, request, status, details, hospitalIds) => {
     const event = {
       ts: nowStamp(),
-      actor: session?.user?.name || "System",
-      role: session?.user?.role || "User",
+      actor: operator?.name || session?.user?.name || "System",
+      role: operator?.classification || session?.user?.role || "User",
+      facilityId: hospital?.id,
+      operatorStaffId: operator?.staffId || null,
+      operatorName: operator?.name || null,
+      operatorClassification: operator?.classification || null,
       action,
       requestId: request.id,
       blockchainId: blockchainId(),
@@ -579,7 +611,7 @@ function TransfersPage({
   };
 
   const confirmRequestResolution = () => {
-    if (!selectedRequest || !permissions.canApprove || !resolutionReason.trim()) return;
+    if (!selectedRequest || !permissions.canProcessRequests || !resolutionReason.trim() || !ensureOperator()) return;
 
     if (requestResolution === "partial") {
       const offered = Number(availableUnits);
@@ -646,7 +678,7 @@ function TransfersPage({
   };
 
   const respondToPartialOffer = (accept) => {
-    if (!selectedRequest || selectedRequest.status !== "Partial Offer") return;
+    if (!selectedRequest || selectedRequest.status !== "Partial Offer" || !ensureOperator()) return;
 
     const respondedAt = nowStamp();
     const nextStatus = accept ? "Requested" : "Cancelled";
@@ -689,7 +721,7 @@ function TransfersPage({
   };
 
   const cancelApprovedTransaction = () => {
-    if (!approvedCancellation || !resolutionReason.trim() || !permissions.canApprove) return;
+    if (!approvedCancellation || !resolutionReason.trim() || !permissions.canProcessRequests || !ensureOperator()) return;
     const request = approvedCancellation.request;
     const transfer = approvedCancellation.transfer;
     const cancelledAt = nowStamp();
@@ -753,6 +785,16 @@ function TransfersPage({
     }
 
     setShowRequestForm(true);
+  };
+
+  const exportCurrentView = () => {
+    const scope = permissions.roleKey === "prc_admin" ? "PRC-authorized supply coordination" : `${hospital?.name} · permitted records`;
+    if (activeTab === "prc") {
+      exportCsvReport({ title: "PRC Supply Coordination", scope, filters: { view: "PRC Supply" }, headers: ["Request ID", "Blood type", "Component", "Units", "Urgency", "Needed by", "Status", "PRC reference"], rows: (prcSupplyRequests || []).map((item) => [item.id, item.type, item.component, item.units, item.urgency, item.neededBy, item.status, item.prcReference]), filename: "prc-supply-coordination" });
+      return;
+    }
+    const rows = activeTab === "requests" ? requests : activeTransfers;
+    exportCsvReport({ title: activeTab === "requests" ? "Blood Requests" : "Blood Transfers", scope, filters: { view: activeTab }, headers: [activeTab === "requests" ? "Request ID" : "Transfer ID", "Blood type", "Component", "Units", "From", "To", "Priority", "Status", "Created", "Operator staff ID", "Operator", "Ledger ID"], rows: rows.map((item) => [item.id, item.type, item.component || "PRBC", item.units, hospitalById(item.from)?.name || item.from, hospitalById(item.to)?.name || item.to, item.urgency, item.status, item.initiated, item.operatorStaffId, item.operatorName || item.requesterName, item.ledgerId || item.tx_hash || item.approvalTxId || item.decisionTxId]), filename: activeTab === "requests" ? "blood-requests" : "blood-transfers" });
   };
 
   /*
@@ -843,7 +885,8 @@ function TransfersPage({
         title="Blood Requests & Transfers"
         sub="View blood requests and track the movement of blood units between participating facilities."
         actions={
-          <>
+          <div className="export-button-group">
+            {permissions.canExportTransfers && <Btn icon="download" onClick={exportCurrentView}>Export CSV</Btn>}
             <button
               type="button"
               className={`btn ${
@@ -860,7 +903,7 @@ function TransfersPage({
               <I name="plus" size={14} />
               New Blood Request
             </button>
-          </>
+          </div>
         }
       />
 
@@ -934,6 +977,10 @@ function TransfersPage({
           <strong>{workflowProfile.owner}</strong>
         </div>
       </div>
+
+      {(permissions.bloodBank || permissions.secondary) && (
+        <OperatorSelector hospital={hospital} staffDirectory={staffDirectory} dutySchedules={dutySchedules} operatorId={operatorId} onOperatorChange={onOperatorChange} />
+      )}
 
       {/* ======================================================
           NEW BLOOD REQUEST FORM
@@ -1020,7 +1067,7 @@ function TransfersPage({
                         .filter((bank) => bank?.id !== hospital?.id)
                         .map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
                     </select>
-                    <span style={helperStyle}>The selected Blood Bank Head will review this request.</span>
+                    <span style={helperStyle}>The selected blood-bank team will review this request.</span>
                   </div>
                 )}
 
@@ -1326,8 +1373,8 @@ function TransfersPage({
             <div className="card-h">
               <div>
                 <h3>Request Review</h3>
-                <div className="sub muted">
-                  Blood Bank Head approval is required before transfer preparation.
+            <div className="sub muted">
+                  Active Blood Bank Head or Blood Bank Staff may accept or decline this request.
                 </div>
               </div>
             </div>
@@ -2179,7 +2226,7 @@ function TransfersPage({
       {decision && selectedRequest && (
         <Modal
           title={`${decision} Blood Request`}
-          sub="Authenticate the Blood Bank Head before recording this decision."
+          sub="Confirm this request decision using the transaction operator selected above."
           onClose={() => setDecision(null)}
           footer={
             <>
@@ -2197,75 +2244,18 @@ function TransfersPage({
             </>
           }
         >
-          <div className="row" style={{ gap: 6, marginBottom: 18 }}>
-            {["Scan", "Manual"].map((item) => (
-              <button
-                key={item}
-                className={`filter-chip ${
-                  authMode === item ? "active" : ""
-                }`}
-                onClick={() => {
-                  setAuthMode(item);
-                  setHeadId("");
-                }}
-              >
-                {item} ID
-              </button>
-            ))}
-          </div>
-
-          {authMode === "Scan" ? (
-            <div className="card">
-              <div className="card-b" style={{ textAlign: "center" }}>
-                <I name="scanner" size={28} />
-                <div style={{ height: 10 }} />
-                <div>Scan Blood Bank Head ID</div>
-                <div className="muted small" style={{ marginTop: 4 }}>
-                  Use the authorized staff barcode or QR credential.
-                </div>
-                <div style={{ height: 16 }} />
-
-                <Btn
-                  kind="primary"
-                  icon="scanner"
-                  onClick={simulateHeadIdScan}
-                >
-                  Simulate ID Scan
-                </Btn>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <label className="small">Blood Bank Head ID</label>
-              <input
-                className="input mono"
-                value={headId}
-                placeholder="Enter authorized ID"
-                onChange={(event) => setHeadId(event.target.value)}
-              />
-            </div>
-          )}
-
-          {headId && (
-            <>
-              <div className="divider" />
-              <dl className="kv">
-                <dt>Authenticated ID</dt>
-                <dd className="mono small">{headId}</dd>
-                <dt>Decision</dt>
-                <dd>
-                  <Chip
-                    kind={decision === "Approve" ? "ok" : "critical"}
-                    dot
-                  >
-                    {decision}
-                  </Chip>
-                </dd>
-                <dt>Request</dt>
-                <dd className="mono small">{selectedRequest.id}</dd>
-              </dl>
-            </>
-          )}
+          <dl className="kv">
+            <dt>Operator</dt>
+            <dd>{operator?.name || "No Active operator selected"}</dd>
+            <dt>Staff ID</dt>
+            <dd className="mono small">{operator?.staffId || "—"}</dd>
+            <dt>Classification</dt>
+            <dd>{operator?.classification || "—"}</dd>
+            <dt>Decision</dt>
+            <dd><Chip kind={decision === "Approve" ? "ok" : "critical"} dot>{decision}</Chip></dd>
+            <dt>Request</dt>
+            <dd className="mono small">{selectedRequest.id}</dd>
+          </dl>
 
           <div className="divider" />
           <div className="muted small">

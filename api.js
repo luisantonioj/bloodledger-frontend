@@ -108,7 +108,35 @@
     return { status: "Committed", block: 124893 };
   }
 
+  async function getAnalytics(scope, filters) {
+    if (!config.mock) {
+      const query = new URLSearchParams(filters || {}).toString();
+      return request(`/analytics/${encodeURIComponent(scope.facilityId || scope.type)}?${query}`);
+    }
+    await wait(180);
+    const isPrc = scope?.type === "prc";
+    const allowedFacilities = isPrc
+      ? (window.HOSPITALS || []).filter((item) => item.is_blood_bank).map((item) => item.id)
+      : [scope?.facilityId];
+    const demand = (window.ANALYTICS_DEMAND || []).filter((row) => {
+      if (!allowedFacilities.includes(row.facilityId)) return false;
+      if (filters?.dateFrom && `${row.month}-28` < filters.dateFrom) return false;
+      if (filters?.dateTo && `${row.month}-01` > filters.dateTo) return false;
+      if (filters?.bloodType && filters.bloodType !== "All" && row.bloodType !== filters.bloodType) return false;
+      if (filters?.component && filters.component !== "All" && row.component !== filters.component) return false;
+      if (!isPrc && filters?.group && filters.group !== "All" && row.department !== filters.group) return false;
+      if (isPrc && filters?.group && filters.group !== "All" && row.requestingFacilityId !== filters.group) return false;
+      return true;
+    });
+    const assessments = (window.ANALYTICS_ASSESSMENTS || []).filter((row) =>
+      allowedFacilities.includes(row.facilityId) &&
+      (!filters?.bloodType || filters.bloodType === "All" || row.bloodType === filters.bloodType) &&
+      (!filters?.component || filters.component === "All" || row.component === filters.component)
+    );
+    return { demand, assessments, meta: window.ANALYTICS_META, scope, confirmedUseAvailable: false };
+  }
+
   Object.assign(window, {
-    BloodLedgerApi: { config, getBootstrap, login, logout, createTransfer, ingestScan },
+    BloodLedgerApi: { config, getBootstrap, login, logout, createTransfer, ingestScan, getAnalytics },
   });
 })();
