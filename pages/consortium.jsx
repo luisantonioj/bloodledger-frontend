@@ -52,7 +52,7 @@ function ConsortiumPage({ hospital, permissions, onNav }) {
 
   const exportConsortium = () => {
     const types = selectedType === "ALL" ? BLOOD_TYPES : [selectedType];
-    exportCsvReport({
+    exportPdfReport({
       title: "Consortium Inventory",
       scope: `${hospital?.name} · authorized blood-bank consortium scope`,
       filters: { component, bloodType: selectedType, chartView: view },
@@ -72,7 +72,7 @@ function ConsortiumPage({ hospital, permissions, onNav }) {
             ? "Find blood units released for redistribution by participating blood banks."
             : "Monitor on-hand and redistributable blood supply across participating hospital blood banks."
         }
-        actions={<div className="export-button-group">{permissions?.canExportConsortium && <Btn icon="download" onClick={exportConsortium}>Export CSV</Btn>}<Chip kind="ok" dot>Network synchronized</Chip></div>}
+        actions={<div className="export-button-group">{permissions?.canExportConsortium && <Btn icon="download" onClick={exportConsortium}>Export PDF</Btn>}<Chip kind="ok" dot>Network synchronized</Chip></div>}
       />
 
       <div className="consortium-summary-grid">

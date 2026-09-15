@@ -21,10 +21,13 @@ function TransfersPage({
   auditRows,
   onUpdateAudit,
   staffDirectory,
-  dutySchedules,
   operatorId,
   operator,
   onOperatorChange,
+  operatorPin,
+  onOperatorPinChange,
+  authorizeOperator,
+  clearOperatorAuthorization,
 }) {
   const transferList = transfers || window.TRANSFERS || [];
   const scopedTransferList = permissions.secondary || permissions.bloodBank
@@ -254,14 +257,10 @@ function TransfersPage({
     setDecision(nextDecision);
   };
 
-  const ensureOperator = () => {
-    if (operator) return true;
-    toast.push({ kind: "warn", text: "Transaction operator required", sub: "Select an Active staff member before continuing." });
-    return false;
-  };
+  const ensureOperator = (purpose) => authorizeOperator?.(purpose);
 
-  const confirmDecision = () => {
-    if (!selectedRequest || !permissions.canProcessRequests || !ensureOperator()) return;
+  const confirmDecision = async () => {
+    if (!selectedRequest || !permissions.canProcessRequests || !(await ensureOperator(`${decision?.toLowerCase()} blood request`))) return;
 
     const decidedAt = nowStamp();
     const decisionTxId = blockchainId();
@@ -346,8 +345,8 @@ function TransfersPage({
     setDecision(null);
   };
 
-  const confirmMovement = () => {
-    if (!selectedTransfer || !movementAction || !ensureOperator()) return;
+  const confirmMovement = async () => {
+    if (!selectedTransfer || !movementAction || !(await ensureOperator(`${movementAction.toLowerCase()} custody transaction`))) return;
 
     const actionAt = nowStamp();
     const actionTxId = blockchainId();
@@ -421,7 +420,7 @@ function TransfersPage({
       return;
     }
 
-    if (!ensureOperator()) return;
+    if (!(await ensureOperator("blood request submission"))) return;
 
     const requiredDetails = [
       requesterName,
@@ -513,8 +512,8 @@ function TransfersPage({
         }
       : null;
 
-  const submitPrcRequest = () => {
-    if (!canCreatePrcRequest || !ensureOperator()) return;
+  const submitPrcRequest = async () => {
+    if (!canCreatePrcRequest || !(await ensureOperator("PRC supply request submission"))) return;
 
     if (!prcNeededBy || Number(prcUnits) < 1) {
       toast.push({
@@ -610,8 +609,8 @@ function TransfersPage({
     setAvailableUnits(Math.max(1, Math.min((selectedRequest?.units || 2) - 1, selectedRequest?.units || 1)));
   };
 
-  const confirmRequestResolution = () => {
-    if (!selectedRequest || !permissions.canProcessRequests || !resolutionReason.trim() || !ensureOperator()) return;
+  const confirmRequestResolution = async () => {
+    if (!selectedRequest || !permissions.canProcessRequests || !resolutionReason.trim() || !(await ensureOperator(requestResolution === "partial" ? "partial availability offer" : "blood request cancellation"))) return;
 
     if (requestResolution === "partial") {
       const offered = Number(availableUnits);
@@ -677,8 +676,8 @@ function TransfersPage({
     setResolutionReason("");
   };
 
-  const respondToPartialOffer = (accept) => {
-    if (!selectedRequest || selectedRequest.status !== "Partial Offer" || !ensureOperator()) return;
+  const respondToPartialOffer = async (accept) => {
+    if (!selectedRequest || selectedRequest.status !== "Partial Offer" || !(await ensureOperator(accept ? "partial offer acceptance" : "partial offer decline"))) return;
 
     const respondedAt = nowStamp();
     const nextStatus = accept ? "Requested" : "Cancelled";
@@ -720,8 +719,8 @@ function TransfersPage({
     setResolutionReason("Approved request cancelled before blood-unit release.");
   };
 
-  const cancelApprovedTransaction = () => {
-    if (!approvedCancellation || !resolutionReason.trim() || !permissions.canProcessRequests || !ensureOperator()) return;
+  const cancelApprovedTransaction = async () => {
+    if (!approvedCancellation || !resolutionReason.trim() || !permissions.canProcessRequests || !(await ensureOperator("approved transfer cancellation"))) return;
     const request = approvedCancellation.request;
     const transfer = approvedCancellation.transfer;
     const cancelledAt = nowStamp();
@@ -790,11 +789,11 @@ function TransfersPage({
   const exportCurrentView = () => {
     const scope = permissions.roleKey === "prc_admin" ? "PRC-authorized supply coordination" : `${hospital?.name} · permitted records`;
     if (activeTab === "prc") {
-      exportCsvReport({ title: "PRC Supply Coordination", scope, filters: { view: "PRC Supply" }, headers: ["Request ID", "Blood type", "Component", "Units", "Urgency", "Needed by", "Status", "PRC reference"], rows: (prcSupplyRequests || []).map((item) => [item.id, item.type, item.component, item.units, item.urgency, item.neededBy, item.status, item.prcReference]), filename: "prc-supply-coordination" });
+      exportPdfReport({ title: "PRC Supply Coordination", scope, filters: { view: "PRC Supply" }, headers: ["Request ID", "Blood type", "Component", "Units", "Urgency", "Needed by", "Status", "PRC reference"], rows: (prcSupplyRequests || []).map((item) => [item.id, item.type, item.component, item.units, item.urgency, item.neededBy, item.status, item.prcReference]), filename: "prc-supply-coordination" });
       return;
     }
     const rows = activeTab === "requests" ? requests : activeTransfers;
-    exportCsvReport({ title: activeTab === "requests" ? "Blood Requests" : "Blood Transfers", scope, filters: { view: activeTab }, headers: [activeTab === "requests" ? "Request ID" : "Transfer ID", "Blood type", "Component", "Units", "From", "To", "Priority", "Status", "Created", "Operator staff ID", "Operator", "Ledger ID"], rows: rows.map((item) => [item.id, item.type, item.component || "PRBC", item.units, hospitalById(item.from)?.name || item.from, hospitalById(item.to)?.name || item.to, item.urgency, item.status, item.initiated, item.operatorStaffId, item.operatorName || item.requesterName, item.ledgerId || item.tx_hash || item.approvalTxId || item.decisionTxId]), filename: activeTab === "requests" ? "blood-requests" : "blood-transfers" });
+    exportPdfReport({ title: activeTab === "requests" ? "Blood Requests" : "Blood Transfers", scope, filters: { view: activeTab }, headers: [activeTab === "requests" ? "Request ID" : "Transfer ID", "Blood type", "Component", "Units", "From", "To", "Priority", "Status", "Created", "Operator staff ID", "Operator", "Ledger ID"], rows: rows.map((item) => [item.id, item.type, item.component || "PRBC", item.units, hospitalById(item.from)?.name || item.from, hospitalById(item.to)?.name || item.to, item.urgency, item.status, item.initiated, item.operatorStaffId, item.operatorName || item.requesterName, item.ledgerId || item.tx_hash || item.approvalTxId || item.decisionTxId]), filename: activeTab === "requests" ? "blood-requests" : "blood-transfers" });
   };
 
   /*
@@ -886,7 +885,7 @@ function TransfersPage({
         sub="View blood requests and track the movement of blood units between participating facilities."
         actions={
           <div className="export-button-group">
-            {permissions.canExportTransfers && <Btn icon="download" onClick={exportCurrentView}>Export CSV</Btn>}
+            {permissions.canExportTransfers && <Btn icon="download" onClick={exportCurrentView}>Export PDF</Btn>}
             <button
               type="button"
               className={`btn ${
@@ -977,10 +976,6 @@ function TransfersPage({
           <strong>{workflowProfile.owner}</strong>
         </div>
       </div>
-
-      {(permissions.bloodBank || permissions.secondary) && (
-        <OperatorSelector hospital={hospital} staffDirectory={staffDirectory} dutySchedules={dutySchedules} operatorId={operatorId} onOperatorChange={onOperatorChange} />
-      )}
 
       {/* ======================================================
           NEW BLOOD REQUEST FORM
@@ -1248,6 +1243,8 @@ function TransfersPage({
                 />
               </div>
 
+              <OperatorAuthorization hospital={hospital} staffDirectory={staffDirectory} operatorId={operatorId} onOperatorChange={onOperatorChange} operatorPin={operatorPin} onOperatorPinChange={onOperatorPinChange} purpose="this blood request submission" />
+
               {/* Form footer */}
               <div style={footerStyle}>
                 <Btn
@@ -1257,6 +1254,7 @@ function TransfersPage({
                     setNote("");
                     setRequestFormFile(null);
                     setPickupDocumentFile(null);
+                    clearOperatorAuthorization?.();
                   }}
                 >
                   Cancel
@@ -1596,6 +1594,7 @@ function TransfersPage({
                           <strong>{hospitalById(selectedRequest.from)?.short || "The supplying blood bank"} has offered a smaller quantity.</strong>
                           <span>Accept {selectedRequest.offeredUnits} unit(s) to continue, or decline and close this request.</span>
                         </div>
+                        <OperatorAuthorization compact hospital={hospital} staffDirectory={staffDirectory} operatorId={operatorId} onOperatorChange={onOperatorChange} operatorPin={operatorPin} onOperatorPinChange={onOperatorPinChange} purpose="this partial-offer response" />
                         <div className="row">
                           <Btn kind="ghost" onClick={() => respondToPartialOffer(false)}>Decline Offer</Btn>
                           <Btn kind="primary" icon="check" onClick={() => respondToPartialOffer(true)}>Accept Available Units</Btn>
@@ -1668,8 +1667,9 @@ function TransfersPage({
                   <span>Coordination Note <span className="muted">Optional</span></span>
                   <textarea value={prcNote} onChange={(event) => setPrcNote(event.target.value)} placeholder="Add handling, pickup, or urgency details..." />
                 </label>
+                <OperatorAuthorization hospital={hospital} staffDirectory={staffDirectory} operatorId={operatorId} onOperatorChange={onOperatorChange} operatorPin={operatorPin} onOperatorPinChange={onOperatorPinChange} purpose="this PRC supply request" />
                 <div className="prc-form-footer">
-                  <Btn kind="ghost" onClick={() => setShowPrcForm(false)}>Cancel</Btn>
+                  <Btn kind="ghost" onClick={() => { setShowPrcForm(false); clearOperatorAuthorization?.(); }}>Cancel</Btn>
                   <Btn kind="primary" icon="check" onClick={submitPrcRequest}>Send to PRC Lipa</Btn>
                 </div>
               </div>
@@ -2130,10 +2130,10 @@ function TransfersPage({
               ? "Notify the requestor that only part of the requested quantity is currently available."
               : "Close the request and send the recorded reason to the requesting facility."
           }
-          onClose={() => setRequestResolution(null)}
+          onClose={() => { setRequestResolution(null); clearOperatorAuthorization?.(); }}
           footer={
             <>
-              <Btn kind="ghost" onClick={() => setRequestResolution(null)}>Keep Request</Btn>
+              <Btn kind="ghost" onClick={() => { setRequestResolution(null); clearOperatorAuthorization?.(); }}>Keep Request</Btn>
               <Btn
                 kind={requestResolution === "partial" ? "primary" : "default"}
                 icon="bell"
@@ -2178,6 +2178,7 @@ function TransfersPage({
               placeholder="Provide the reason shown in the requestor's alert..."
             />
           </label>
+          <OperatorAuthorization hospital={hospital} staffDirectory={staffDirectory} operatorId={operatorId} onOperatorChange={onOperatorChange} operatorPin={operatorPin} onOperatorPinChange={onOperatorPinChange} purpose={requestResolution === "partial" ? "this partial availability offer" : "this request cancellation"} />
         </Modal>
       )}
 
@@ -2185,10 +2186,10 @@ function TransfersPage({
         <Modal
           title="Cancel Approved Transfer"
           sub="This closes the approved request and its linked transfer before blood-unit release."
-          onClose={() => setApprovedCancellation(null)}
+          onClose={() => { setApprovedCancellation(null); clearOperatorAuthorization?.(); }}
           footer={
             <>
-              <Btn kind="ghost" onClick={() => setApprovedCancellation(null)}>Keep Approved</Btn>
+              <Btn kind="ghost" onClick={() => { setApprovedCancellation(null); clearOperatorAuthorization?.(); }}>Keep Approved</Btn>
               <Btn kind="default" icon="bell" onClick={cancelApprovedTransaction}>
                 Notify & Cancel
               </Btn>
@@ -2220,17 +2221,18 @@ function TransfersPage({
               placeholder="State the reason recorded in the audit trail and sent to the requestor..."
             />
           </label>
+          <OperatorAuthorization hospital={hospital} staffDirectory={staffDirectory} operatorId={operatorId} onOperatorChange={onOperatorChange} operatorPin={operatorPin} onOperatorPinChange={onOperatorPinChange} purpose="this approved transfer cancellation" />
         </Modal>
       )}
 
       {decision && selectedRequest && (
         <Modal
           title={`${decision} Blood Request`}
-          sub="Confirm this request decision using the transaction operator selected above."
-          onClose={() => setDecision(null)}
+          sub="Authenticate the staff member making this request decision."
+          onClose={() => { setDecision(null); clearOperatorAuthorization?.(); }}
           footer={
             <>
-              <Btn kind="ghost" onClick={() => setDecision(null)}>
+              <Btn kind="ghost" onClick={() => { setDecision(null); clearOperatorAuthorization?.(); }}>
                 Cancel
               </Btn>
 
@@ -2245,18 +2247,14 @@ function TransfersPage({
           }
         >
           <dl className="kv">
-            <dt>Operator</dt>
-            <dd>{operator?.name || "No Active operator selected"}</dd>
-            <dt>Staff ID</dt>
-            <dd className="mono small">{operator?.staffId || "—"}</dd>
-            <dt>Classification</dt>
-            <dd>{operator?.classification || "—"}</dd>
             <dt>Decision</dt>
             <dd><Chip kind={decision === "Approve" ? "ok" : "critical"} dot>{decision}</Chip></dd>
             <dt>Request</dt>
             <dd className="mono small">{selectedRequest.id}</dd>
           </dl>
 
+          <div className="divider" />
+          <OperatorAuthorization hospital={hospital} staffDirectory={staffDirectory} operatorId={operatorId} onOperatorChange={onOperatorChange} operatorPin={operatorPin} onOperatorPinChange={onOperatorPinChange} purpose={`this ${decision.toLowerCase()} decision`} />
           <div className="divider" />
           <div className="muted small">
             Confirming records the decision on the mock ledger and generates a
@@ -2277,10 +2275,10 @@ function TransfersPage({
               ? `This confirms that the approved blood units have left ${hospitalById(selectedTransfer.from)?.short || "the supplying blood bank"}.`
               : "This confirms that the receiving hospital has accepted the blood units."
           }
-          onClose={() => setMovementAction(null)}
+          onClose={() => { setMovementAction(null); clearOperatorAuthorization?.(); }}
           footer={
             <>
-              <Btn kind="ghost" onClick={() => setMovementAction(null)}>
+              <Btn kind="ghost" onClick={() => { setMovementAction(null); clearOperatorAuthorization?.(); }}>
                 Cancel
               </Btn>
               <Btn kind="primary" icon="check" onClick={confirmMovement}>
@@ -2313,6 +2311,8 @@ function TransfersPage({
               </Chip>
             </dd>
           </dl>
+          <div className="divider" />
+          <OperatorAuthorization hospital={hospital} staffDirectory={staffDirectory} operatorId={operatorId} onOperatorChange={onOperatorChange} operatorPin={operatorPin} onOperatorPinChange={onOperatorPinChange} purpose={`this ${movementAction.toLowerCase()} custody action`} />
         </Modal>
       )}
     </div>

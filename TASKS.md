@@ -84,11 +84,11 @@ The ML module and its Predicted Distributable Surplus output are core to BROA's 
 
 ## P2 â€” Search and export functionality
 
-Several existing buttons are currently non-functional placeholders (present in the mock for visual completeness): the global `âŒ˜K` topbar search, "Export"/"Export CSV"/"Export consortium"/"Export PDF" buttons across Inventory/Audit/Consortium/Reporting/Scanner, "Threshold rules"/"Subscriptions" on Alerts, "Manual entry"/"Scanner status" on Scanner, "File DOH Form 2A" on Reporting.
+Several existing buttons are currently non-functional placeholders (present in the mock for visual completeness): the global `âŒ˜K` topbar search, "Threshold rules"/"Subscriptions" on Alerts, "Manual entry"/"Scanner status" on Scanner, and "File DOH Form 2A" on Reporting. Role-scoped PDF report downloads are implemented for the operational, analytics, audit, consortium, and compliance tables.
 
 - [ ] **7.1 Inventory list this file's exact set of placeholder buttons per page** (audit each `pages/*.jsx` for `onClick`-less `Btn`s) and confirm with stakeholders which are in scope for this deployment phase vs. future work.
 - [ ] **7.2 Implement global search** (topbar) against real transfer/alert/ISBT data once backend search/filter endpoints exist â€” keep the existing `âŒ˜K` UI treatment.
-- [ ] **7.3 Implement CSV/PDF export** for the tables that advertise it, backed by real data once available (this is explicitly part of the proposal's "automate report generation" objective for Reporting in particular).
+- [x] **7.3 Implement PDF export** for the tables that advertise it using current filtered mock data. Replace the mock fallback with backend-generated or signed reports when real data becomes available.
 
 ---
 

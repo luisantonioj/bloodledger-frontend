@@ -756,12 +756,6 @@ function Sidebar({
           badge: badges.accounts,
           show: permissions?.canManageAccounts,
         },
-        {
-          id: "staff",
-          name: "Staff & Schedule",
-          icon: "calendar",
-          show: permissions?.canManageStaff,
-        },
       ],
     },
 
@@ -1591,33 +1585,11 @@ function fmtDate(
 }
 
 
-// ───── Facility attribution & CSV reporting ───────────────
+// ───── Facility attribution, operator authorization & PDF reporting ─────
 
 function activeStaffForFacility(facilityId, directory) {
   return ((directory || window.STAFF_DIRECTORY || {})[facilityId] || [])
     .filter((staff) => staff.status === "Active");
-}
-
-
-function parseFacilityDateTime(value) {
-  const date = new Date(String(value || "").replace(" ", "T"));
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-
-function currentDutyForFacility(facilityId, schedules, at) {
-  const now = at || new Date();
-  const current = ((schedules || window.DUTY_SCHEDULES || {})[facilityId] || [])
-    .filter((entry) => {
-      const start = parseFacilityDateTime(entry.shift_start);
-      const end = parseFacilityDateTime(entry.shift_end);
-      return start && end && start <= now && now <= end;
-    });
-  return {
-    primary: current.find((entry) => entry.assignment === "Primary") || null,
-    supporting: current.filter((entry) => entry.assignment === "Supporting"),
-    entries: current,
-  };
 }
 
 
@@ -1641,133 +1613,127 @@ function transactionAttribution(facilityId, staff, action) {
 }
 
 
-function csvCell(value) {
-  const normalized = value == null || value === "" ? "Not available" : String(value);
-  return `"${normalized.replace(/"/g, '""')}"`;
+async function reportPayloadHash(payload) {
+  const bytes = new TextEncoder().encode(JSON.stringify(payload));
+  const digest = await window.crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 
-function exportCsvReport({ title, scope, filters, headers, rows, filename, simulation }) {
+async function exportPdfReport({ title, scope, filters, headers, rows, filename, simulation, orientation }) {
+  if (!(rows || []).length) {
+    window.alert("There are no records in the current filtered view to export.");
+    return false;
+  }
+
+  const JsPdf = window.jspdf?.jsPDF;
+  if (!JsPdf) {
+    window.alert("The PDF generator is unavailable. Refresh the page and try again.");
+    return false;
+  }
+
   const filterText = Object.entries(filters || {})
     .filter(([, value]) => value != null && value !== "" && value !== "All")
     .map(([key, value]) => `${key}: ${value}`)
     .join("; ") || "None";
   const generatedAt = new Date().toISOString();
-  const lines = [
-    ["Report title", title],
-    ["Reporting scope", scope || "Authorized facility scope"],
-    ["Active filters", filterText],
-    ["Generated at", generatedAt],
-    ["Simulation status", simulation ? "Synthetic / simulation only" : "Operational mock records"],
-    [],
-    headers,
-    ...(rows || []),
+  const reportId = `RPT-${generatedAt.slice(0, 10).replaceAll("-", "")}-${String(Date.now()).slice(-6)}`;
+  const body = rows.map((row) => row.map((value) => value == null || value === "" ? "Not available" : String(value)));
+  const checksum = await reportPayloadHash({ title, scope, filters, headers, rows: body, generatedAt, reportId, simulation: !!simulation });
+  const landscape = orientation === "landscape" || (!orientation && headers.length > 6);
+  const doc = new JsPdf({ orientation: landscape ? "landscape" : "portrait", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 36;
+
+  doc.setFillColor(167, 24, 28);
+  doc.roundedRect(margin, 32, 28, 28, 6, 6, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text("B", margin + 9, 51);
+  doc.setTextColor(25, 27, 30);
+  doc.setFontSize(17);
+  doc.text("BloodLedger", margin + 38, 46);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(91, 101, 114);
+  doc.text("TAMPER-EVIDENT BLOOD INVENTORY MANAGEMENT", margin + 38, 58);
+  doc.setDrawColor(218, 210, 198);
+  doc.line(margin, 72, pageWidth - margin, 72);
+
+  doc.setTextColor(25, 27, 30);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text(title, margin, 96);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(72, 80, 91);
+  const metadata = [
+    `Report ID: ${reportId}`,
+    `Scope: ${scope || "Authorized facility scope"}`,
+    `Active filters: ${filterText}`,
+    `Generated: ${generatedAt}`,
+    `Records: ${body.length}`,
+    `Status: ${simulation ? "Synthetic / simulation only" : "Operational mock records"}`,
   ];
-  const content = `\ufeff${lines.map((row) => row.map(csvCell).join(",")).join("\r\n")}`;
-  const blob = new Blob([content], { type: "text/csv;charset=utf-8" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = `${filename || title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${generatedAt.slice(0, 10)}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-}
+  metadata.forEach((line, index) => doc.text(line, margin, 112 + index * 12));
+  doc.setFontSize(7.5);
+  doc.setTextColor(79, 91, 111);
+  doc.text(`Data integrity checksum (SHA-256): ${checksum}`, margin, 190);
+  doc.setTextColor(140, 84, 0);
+  doc.text("Prototype checksum only. PDF presentation is fixed but not cryptographically signed.", margin, 202);
 
-
-function parseCsvText(text) {
-  const rows = [];
-  let row = [];
-  let cell = "";
-  let quoted = false;
-  const source = String(text || "").replace(/^\ufeff/, "");
-  for (let index = 0; index < source.length; index += 1) {
-    const char = source[index];
-    if (char === '"' && quoted && source[index + 1] === '"') {
-      cell += '"';
-      index += 1;
-    } else if (char === '"') quoted = !quoted;
-    else if (char === "," && !quoted) {
-      row.push(cell.trim());
-      cell = "";
-    } else if ((char === "\n" || char === "\r") && !quoted) {
-      if (char === "\r" && source[index + 1] === "\n") index += 1;
-      row.push(cell.trim());
-      if (row.some((value) => value !== "")) rows.push(row);
-      row = [];
-      cell = "";
-    } else cell += char;
-  }
-  row.push(cell.trim());
-  if (row.some((value) => value !== "")) rows.push(row);
-  return rows;
-}
-
-
-function OperatorSelector({ hospital, staffDirectory, dutySchedules, operatorId, onOperatorChange, compact }) {
-  const facilityId = hospital?.id;
-  const active = activeStaffForFacility(facilityId, staffDirectory);
-  const duty = currentDutyForFacility(facilityId, dutySchedules);
-  const effectiveId = operatorId || duty.primary?.staff_id || "";
-  const [pendingId, setPendingId] = React.useState("");
-  const [reason, setReason] = React.useState("Schedule change");
-  const [other, setOther] = React.useState("");
-  const ordered = [...active].sort((a, b) => {
-    const rank = (staff) => staff.staffId === duty.primary?.staff_id ? 0 : duty.supporting.some((entry) => entry.staff_id === staff.staffId) ? 1 : 2;
-    return rank(a) - rank(b) || a.name.localeCompare(b.name);
+  doc.autoTable({
+    startY: 218,
+    head: [headers.map(String)],
+    body,
+    theme: "grid",
+    margin: { left: margin, right: margin, bottom: 36 },
+    styles: { font: "helvetica", fontSize: headers.length > 9 ? 6.5 : 7.5, cellPadding: 4, overflow: "linebreak", valign: "middle", textColor: [31, 37, 45], lineColor: [222, 216, 207], lineWidth: 0.4 },
+    headStyles: { fillColor: [20, 29, 42], textColor: [255, 255, 255], fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [248, 246, 242] },
+    didDrawPage: () => {
+      const pageNumber = doc.internal.getNumberOfPages();
+      const height = doc.internal.pageSize.getHeight();
+      doc.setFontSize(7.5);
+      doc.setTextColor(91, 101, 114);
+      doc.text(`${reportId} · Page ${pageNumber}`, margin, height - 18);
+      doc.text("Generated from the authorized filtered view", pageWidth - margin, height - 18, { align: "right" });
+    },
   });
-  const current = operatorById(facilityId, effectiveId, staffDirectory);
-  const pending = operatorById(facilityId, pendingId, staffDirectory);
 
-  const select = (nextId) => {
-    if (!effectiveId) {
-      onOperatorChange?.(nextId, "Manual selection");
-      return;
-    }
-    if (nextId !== effectiveId) setPendingId(nextId);
-  };
+  const safeName = filename || title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  doc.save(`${safeName}-${generatedAt.slice(0, 10)}.pdf`);
+  return true;
+}
 
-  const confirm = () => {
-    if (reason === "Other" && !other.trim()) return;
-    onOperatorChange?.(pendingId, reason === "Other" ? `Other: ${other.trim()}` : reason, duty.primary?.staff_id || null, duty.primary?.shift_end || null);
-    setPendingId("");
-    setReason("Schedule change");
-    setOther("");
-  };
+
+function OperatorAuthorization({ hospital, staffDirectory, operatorId, onOperatorChange, operatorPin, onOperatorPinChange, compact, purpose }) {
+  const facilityId = hospital?.id;
+  const active = activeStaffForFacility(facilityId, staffDirectory).sort((a, b) => a.name.localeCompare(b.name));
+  const current = operatorById(facilityId, operatorId, staffDirectory);
 
   return (
-    <div className={`operator-selector ${compact ? "compact" : ""}`}>
+    <div className={`operator-authorization ${compact ? "compact" : ""}`}>
       <div>
-        <span className="page-eyebrow">Transaction operator</span>
-        <strong>{current ? `${current.name} · ${current.classification}` : "Select an Active staff member"}</strong>
-        <small>{duty.primary ? `Scheduled Primary · ${duty.primary.shift_start}–${duty.primary.shift_end}` : "No matching duty schedule; manual selection required."}</small>
+        <span className="page-eyebrow">Operator authorization required</span>
+        <strong>{current ? `${current.name} · ${current.classification}` : "Select the person performing this action"}</strong>
+        <small>A fresh personal PIN is required for {purpose || "this ledger-changing action"}. Selection alone does not authorize it.</small>
       </div>
-      <label>
-        <span className="sr-only">Transaction operator</span>
-        <select value={effectiveId} onChange={(event) => select(event.target.value)}>
-          <option value="">Select operator…</option>
-          {ordered.map((staff) => (
-            <option key={staff.staffId} value={staff.staffId}>
-              {staff.name} · {staff.staffId} · {staff.classification}
-            </option>
-          ))}
-        </select>
-      </label>
-      {pendingId && (
-        <Modal
-          title="Confirm operator change"
-          sub="This override remains selected for the current shift and will be recorded in Activity History."
-          onClose={() => setPendingId("")}
-          footer={<><Btn kind="ghost" onClick={() => setPendingId("")}>Keep Current</Btn><Btn kind="primary" icon="check" disabled={reason === "Other" && !other.trim()} onClick={confirm}>Confirm Operator</Btn></>}
-        >
-          <dl className="kv">
-            <dt>Original</dt><dd>{current?.name || "No operator"} <span className="mono small">{current?.staffId}</span></dd>
-            <dt>Replacement</dt><dd>{pending?.name} <span className="mono small">{pending?.staffId}</span></dd>
-          </dl>
-          <label className="field"><span>Reason</span><select value={reason} onChange={(event) => setReason(event.target.value)}><option>Schedule change</option><option>Emergency coverage</option><option>Shift handover</option><option>Other</option></select></label>
-          {reason === "Other" && <label className="field"><span>Explanation</span><textarea value={other} maxLength="180" onChange={(event) => setOther(event.target.value)} placeholder="Briefly explain this operator override…" /></label>}
-        </Modal>
-      )}
+      <div className="operator-authorization-fields">
+        <label className="field">
+          <span>Active staff member</span>
+          <select value={operatorId || ""} onChange={(event) => onOperatorChange?.(event.target.value)}>
+            <option value="">Select operator…</option>
+            {active.map((staff) => <option key={staff.staffId} value={staff.staffId}>{staff.name} · {staff.staffId} · {staff.classification}</option>)}
+          </select>
+        </label>
+        <label className="field">
+          <span>Personal operator PIN</span>
+          <input type="password" inputMode="numeric" autoComplete="off" maxLength="6" value={operatorPin || ""} onChange={(event) => onOperatorPinChange?.(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="Enter 6-digit PIN" />
+        </label>
+      </div>
+      <div className="operator-auth-note"><I name="shield" size={15} /><span>The PIN is verified for this action only and is never written to Activity History.</span></div>
     </div>
   );
 }
@@ -1805,12 +1771,9 @@ Object.assign(
     visibleAlertsForRole,
     transferStatusKind,
     activeStaffForFacility,
-    parseFacilityDateTime,
-    currentDutyForFacility,
     operatorById,
     transactionAttribution,
-    exportCsvReport,
-    parseCsvText,
-    OperatorSelector,
+    exportPdfReport,
+    OperatorAuthorization,
   }
 );

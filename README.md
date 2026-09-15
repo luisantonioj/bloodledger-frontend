@@ -6,7 +6,7 @@ The current codebase is a **high-fidelity mock/prototype**, not yet wired to any
 
 ## What BloodLedger is
 
-A permissioned consortium blockchain (Hyperledger Fabric) synchronizes blood inventory across participating Lipa City blood banks, requestor facilities, the Philippine Red Cross Lipa Chapter, and DOH-CHD Calabarzon. Facility Accounts identify each institution while operator attribution records the active staff member responsible for a mutable action. The prototype also demonstrates read-only historical-demand Analytics, simulation-only redistribution assessments, mobile OCR blood-unit capture, and role-scoped CSV reporting. All operational and analytical data remains synthetic until the backend, blockchain, and forecasting services are integrated.
+A permissioned consortium blockchain (Hyperledger Fabric) synchronizes blood inventory across participating Lipa City blood banks, requestor facilities, the Philippine Red Cross Lipa Chapter, and DOH-CHD Calabarzon. Facility Accounts identify each institution while fresh personal operator-PIN verification attributes every mutable action. The prototype also demonstrates read-only historical-demand Analytics, simulation-only redistribution assessments, mobile OCR blood-unit capture, and role-scoped PDF reporting. All operational and analytical data remains synthetic until the backend, blockchain, and forecasting services are integrated.
 
 See `context.md` for target users, features, and flows; `design.md` for the visual system; `agents.md` for coding rules; `tasks.md` for the build plan.
 
@@ -23,6 +23,7 @@ The prototype intentionally uses **no build step** — everything runs from stat
 | State | React hooks only (`useState`, `useEffect`, `useContext`) | No Redux/Zustand/Context library; one root `App` component owns navigation and session state |
 | Mock data | `data.js`, assigned onto `window` | Stand-in for the future REST/blockchain-backed API |
 | OCR | Tesseract.js 6.0.1 + English model | Pinned local browser assets; recognizes printed ISBT-128 donation serials without a cloud OCR call |
+| PDF reporting | jsPDF 2.5.2 + AutoTable 3.8.4 | Pinned local browser assets; generates fixed-layout, role-scoped table reports |
 | Icons | Hand-drawn inline SVG paths (`ICONS` map in `components.jsx`) | No icon package dependency |
 | Charts | Hand-rolled inline SVG (`Spark`, bar rows, heatmap cells, network topology map) | No charting library |
 
@@ -65,7 +66,6 @@ bloodledger-frontend/
 │   ├── scanner.jsx             # Mobile OCR capture, inbound/outbound preview and transaction log
 │   ├── consortium.jsx          # Cross-hospital heatmap, network topology map, peer table
 │   ├── analytics.jsx           # Historical demand and simulation-only redistribution assessment
-│   ├── staff.jsx               # Facility staff directory and duty-schedule administration
 │   ├── audit.jsx                # Immutable ledger / audit trail viewer
 │   └── reporting.jsx             # Blood-bank checkpoint capture and compliance records
 ├── vendor/ocr/             # Pinned Tesseract browser runtime, worker, core, and English model
@@ -85,7 +85,24 @@ No install step is required.
    python3 -m http.server 5500
    ```
 2. Open the printed local URL in a browser.
-3. The app boots straight into the dashboard using the **Mary Mediatrix Blood Bank Facility Account**. Staff responsibility is selected inside ledger-changing actions and defaults to the scheduled Primary operator. Use the floating tweaks panel (bottom-right) → **Demo → Show login screen** to see the login page.
+3. The app boots straight into the dashboard using the **Mary Mediatrix Blood Bank Facility Account**. Every ledger-changing confirmation requires an Active staff member and their fresh six-digit personal operator PIN. Use the floating tweaks panel (bottom-right) → **Demo → Show login screen** to see the login page.
+
+### Demo-only operator PINs
+
+These PINs exist only in the static mock and are stored as SHA-256 fixture hashes. Production verification must be server-side.
+
+| Facility | Staff member | Operator PIN | Administrative PIN |
+|---|---|---:|---:|
+| Mary Mediatrix | Dr. R. Reyes | `482642` | `4826` |
+| Mary Mediatrix | M. Santos, RMT | `731904` | — |
+| Lipa Medix | Dr. M. Dela Cruz | `264953` | `2649` |
+| Lipa Medix | A. Lim, RMT | `583127` | — |
+| Lipa Medix | S. Bautista | `917364` | — |
+| N.L. Villa | Dr. P. Hernandez | `815307` | `8153` |
+| N.L. Villa | D. Flores, RMT | `346218` | — |
+| N.L. Villa | N. Aquino | `672405` | — |
+| Metro Lipa | C. Tan | `731584` | `7315` |
+| Metro Lipa | J. Ramos, RMT | `458219` | — |
 
 The mobile scanner is available from **Blood Unit Transactions**. The desktop page is a transaction hub; **Open Mobile Scanner** opens the responsive phone simulation without changing the URL. Camera capture requires HTTPS on a phone, or `localhost` during development. **Try Demo Label** exercises the same local OCR worker without requesting camera permission.
 

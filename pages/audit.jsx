@@ -90,7 +90,7 @@ function AuditPage({ hospital, permissions, onNav, auditRows: sharedAuditRows })
     );
   });
 
-  const exportActivity = () => exportCsvReport({
+  const exportActivity = () => exportPdfReport({
     title: "Activity History",
     scope: `${hospital?.name} · permitted activity records`,
     filters: { activityType: typeFilter, search: search || "None" },
@@ -109,7 +109,7 @@ function AuditPage({ hospital, permissions, onNav, auditRows: sharedAuditRows })
         }
         title="Activity History"
         sub="Review recent inventory, request, and transfer activities recorded in the system."
-        actions={permissions?.canExportAudit ? <Btn icon="download" onClick={exportActivity}>Export CSV</Btn> : null}
+        actions={permissions?.canExportAudit ? <Btn icon="download" onClick={exportActivity}>Export PDF</Btn> : null}
       />
 
       <div className="card">

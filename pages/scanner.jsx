@@ -74,10 +74,13 @@ function ScannerPage({
   auditRows,
   onUpdateAudit,
   staffDirectory,
-  dutySchedules,
   operatorId,
   operator,
   onOperatorChange,
+  operatorPin,
+  onOperatorPinChange,
+  authorizeOperator,
+  clearOperatorAuthorization,
 }) {
   const inboundOnly = Boolean(permissions?.secondary);
   const emptyForm = {
@@ -202,6 +205,7 @@ function ScannerPage({
 
   const closeMobileScanner = () => {
     resetEntry();
+    clearOperatorAuthorization?.();
     setShowMobileScanner(false);
     window.setTimeout(() => launcherRef.current?.focus(), 0);
   };
@@ -585,13 +589,11 @@ function ScannerPage({
   const createRecordId = (prefix) =>
     `${prefix}-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
 
-  const confirmTransaction = () => {
+  const confirmTransaction = async () => {
     if (!preview) return;
 
-    if (!operator) {
-      toast.push({ kind: "warn", text: "Transaction operator required", sub: "Select an Active staff member before recording this blood-unit transaction." });
-      return;
-    }
+    const verifiedOperator = await authorizeOperator?.(`${direction.toLowerCase()} blood unit transaction`);
+    if (!verifiedOperator) return;
 
     if (inboundOnly && direction !== "Inbound") {
       toast.push({
@@ -621,7 +623,7 @@ function ScannerPage({
         minute: "2-digit",
       }),
       recordedAt: now.toISOString(),
-      ...transactionAttribution(hospital?.id, operator, `${direction} blood unit transaction`),
+      ...transactionAttribution(hospital?.id, verifiedOperator, `${direction} blood unit transaction`),
     };
 
     const nextHistory = [transaction, ...history];
@@ -669,12 +671,12 @@ function ScannerPage({
     const nextAuditRows = [
       {
         ts: now.toISOString().slice(0, 19).replace("T", " "),
-        actor: operator.name,
-        role: operator.classification,
+        actor: verifiedOperator.name,
+        role: verifiedOperator.classification,
         facilityId: hospital?.id,
-        operatorStaffId: operator.staffId,
-        operatorName: operator.name,
-        operatorClassification: operator.classification,
+        operatorStaffId: verifiedOperator.staffId,
+        operatorName: verifiedOperator.name,
+        operatorClassification: verifiedOperator.classification,
         action:
           direction === "Inbound"
             ? "Blood unit received"
@@ -705,7 +707,7 @@ function ScannerPage({
     });
   };
 
-  const exportTransactions = () => exportCsvReport({
+  const exportTransactions = () => exportPdfReport({
     title: inboundOnly ? "Blood Unit Receipt History" : "Blood Unit Transactions",
     scope: `${hospital?.name} · ${inboundOnly ? "inbound receipt history" : "authorized blood-unit transactions"}`,
     filters: { direction: inboundOnly ? "Inbound" : "All permitted directions" },
@@ -726,7 +728,7 @@ function ScannerPage({
         }
         actions={
           <div className="export-button-group">
-            {permissions.canExportTransactions && <Btn size="sm" icon="download" onClick={exportTransactions}>Export CSV</Btn>}
+            {permissions.canExportTransactions && <Btn size="sm" icon="download" onClick={exportTransactions}>Export PDF</Btn>}
             {permissions.canViewInventory && <Btn size="sm" kind="ghost" onClick={() => onNav("inventory")}>View Inventory</Btn>}
           </div>
         }
@@ -782,7 +784,6 @@ function ScannerPage({
             </div>
 
             <div className="mobile-phone-body">
-              <OperatorSelector compact hospital={hospital} staffDirectory={staffDirectory} dutySchedules={dutySchedules} operatorId={operatorId} onOperatorChange={onOperatorChange} />
               {!isOnline && (
                 <div className="scanner-offline-banner">
                   <I name="warn" size={16} />
@@ -1264,7 +1265,7 @@ function ScannerPage({
                 <h3>Confirm {direction} Transaction</h3>
                 <p>Verify these details before recording.</p>
               </div>
-              <button className="icon-btn" onClick={() => setConfirming(false)} aria-label="Close confirmation">×</button>
+              <button className="icon-btn" onClick={() => { setConfirming(false); clearOperatorAuthorization?.(); }} aria-label="Close confirmation">×</button>
             </div>
             <div className="phone-confirmation-body">
               <dl className="kv">
@@ -1290,6 +1291,8 @@ function ScannerPage({
                 <dd>{preview.purpose}</dd>
               </dl>
               <div className="divider" />
+              <OperatorAuthorization compact hospital={hospital} staffDirectory={staffDirectory} operatorId={operatorId} onOperatorChange={onOperatorChange} operatorPin={operatorPin} onOperatorPinChange={onOperatorPinChange} purpose={`this ${direction.toLowerCase()} transaction`} />
+              <div className="divider" />
               <div className="muted small">
                 {isOnline
                   ? "Confirming creates scan, transaction, and mock blockchain identifiers."
@@ -1297,7 +1300,7 @@ function ScannerPage({
               </div>
             </div>
             <div className="phone-confirmation-footer">
-              <Btn kind="ghost" onClick={() => setConfirming(false)}>Go Back</Btn>
+              <Btn kind="ghost" onClick={() => { setConfirming(false); clearOperatorAuthorization?.(); }}>Go Back</Btn>
               <Btn kind="primary" icon="check" onClick={confirmTransaction}>Confirm & Record</Btn>
             </div>
           </section>

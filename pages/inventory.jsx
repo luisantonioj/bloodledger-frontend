@@ -6,7 +6,7 @@
 // surplus logic, and transfer assumptions can be reintroduced after
 // stakeholder requirements are confirmed.
 
-function InventoryPage({ hospital, permissions, filter, onNav, staffDirectory, dutySchedules, operatorId, operator, onOperatorChange, auditRows, onUpdateAudit }) {
+function InventoryPage({ hospital, permissions, filter, onNav, staffDirectory, operatorId, operator, onOperatorChange, operatorPin, onOperatorPinChange, authorizeOperator, clearOperatorAuthorization, auditRows, onUpdateAudit }) {
   const [activeType, setActiveType] = React.useState(filter?.type || "ALL");
   const [comp, setComp] = React.useState("ALL");
   const [search, setSearch] = React.useState("");
@@ -25,11 +25,9 @@ function InventoryPage({ hospital, permissions, filter, onNav, staffDirectory, d
     [inventoryVersion, hospital?.id]
   );
 
-  const importUnits = (units) => {
-    if (!operator) {
-      toast.push({ kind: "warn", text: "Transaction operator required", sub: "Select an Active staff member before importing blood units." });
-      return;
-    }
+  const importUnits = async (units) => {
+    const verifiedOperator = await authorizeOperator?.("blood inventory import");
+    if (!verifiedOperator) return;
     if (hospital?.id === "MMC-LIP") {
       window.INVENTORY = [...(window.INVENTORY || []), ...units];
     } else {
@@ -40,7 +38,7 @@ function InventoryPage({ hospital, permissions, filter, onNav, staffDirectory, d
     }
     setInventoryVersion((version) => version + 1);
     setImportOpen(false);
-    const event = { ts: new Date().toISOString().slice(0, 19).replace("T", " "), actor: operator.name, role: operator.classification, facilityId: hospital?.id, operatorStaffId: operator.staffId, operatorName: operator.name, operatorClassification: operator.classification, action: "Blood inventory CSV imported", target: `${units.length} blood unit(s)`, status: "Recorded", blockchainId: transactionAttribution(hospital?.id, operator, "Blood inventory CSV imported").ledgerId, hospitalIds: [hospital?.id].filter(Boolean) };
+    const event = { ts: new Date().toISOString().slice(0, 19).replace("T", " "), actor: verifiedOperator.name, role: verifiedOperator.classification, facilityId: hospital?.id, operatorStaffId: verifiedOperator.staffId, operatorName: verifiedOperator.name, operatorClassification: verifiedOperator.classification, action: "Blood inventory CSV imported", target: `${units.length} blood unit(s)`, status: "Recorded", blockchainId: transactionAttribution(hospital?.id, verifiedOperator, "Blood inventory CSV imported").ledgerId, hospitalIds: [hospital?.id].filter(Boolean) };
     onUpdateAudit?.([event, ...(auditRows || [])]);
     toast.push({
       kind: "ok",
@@ -104,7 +102,7 @@ function InventoryPage({ hospital, permissions, filter, onNav, staffDirectory, d
     return (a.days_left || 9999) - (b.days_left || 9999);
   });
 
-  const exportInventory = () => exportCsvReport({
+  const exportInventory = () => exportPdfReport({
     title: "Blood Inventory",
     scope: `${hospital?.name} · authorized inventory`,
     filters: { bloodType: activeType, component: comp, search: search || "None" },
@@ -126,7 +124,7 @@ function InventoryPage({ hospital, permissions, filter, onNav, staffDirectory, d
         actions={
           <>
             {permissions.canExportInventory && (
-              <Btn icon="download" onClick={exportInventory}>Export CSV</Btn>
+              <Btn icon="download" onClick={exportInventory}>Export PDF</Btn>
             )}
             {permissions.canScan && (
               <>
@@ -141,10 +139,6 @@ function InventoryPage({ hospital, permissions, filter, onNav, staffDirectory, d
           </>
         }
       />
-
-      {permissions.canScan && (
-        <OperatorSelector hospital={hospital} staffDirectory={staffDirectory} dutySchedules={dutySchedules} operatorId={operatorId} onOperatorChange={onOperatorChange} />
-      )}
 
       <div className="card">
         {/* Filters */}
@@ -443,8 +437,9 @@ function InventoryPage({ hospital, permissions, filter, onNav, staffDirectory, d
       {importOpen && (
         <InventoryImportModal
           existingInventory={inventory}
-          onClose={() => setImportOpen(false)}
+          onClose={() => { setImportOpen(false); clearOperatorAuthorization?.(); }}
           onImport={importUnits}
+          operatorAuthorization={<OperatorAuthorization hospital={hospital} staffDirectory={staffDirectory} operatorId={operatorId} onOperatorChange={onOperatorChange} operatorPin={operatorPin} onOperatorPinChange={onOperatorPinChange} purpose="this inventory import" />}
         />
       )}
     </div>
@@ -481,7 +476,7 @@ function facilityInventory(hospital) {
   return generated;
 }
 
-function InventoryImportModal({ existingInventory, onClose, onImport }) {
+function InventoryImportModal({ existingInventory, onClose, onImport, operatorAuthorization }) {
   const [fileName, setFileName] = React.useState("");
   const [rows, setRows] = React.useState([]);
   const [error, setError] = React.useState("");
@@ -629,6 +624,8 @@ function InventoryImportModal({ existingInventory, onClose, onImport }) {
       </div>
 
       {error && <div className="auth-login-error" role="alert" style={{ marginTop: 14 }}>{error}</div>}
+
+      {rows.length > 0 && operatorAuthorization}
 
       {rows.length > 0 && (
         <>

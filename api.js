@@ -9,6 +9,12 @@
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  async function sha256(value) {
+    const bytes = new TextEncoder().encode(String(value || ""));
+    const digest = await window.crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+
   async function request(path, options) {
     if (config.mock) return null;
     const res = await fetch(`${config.baseUrl}${path}`, {
@@ -108,6 +114,42 @@
     return { status: "Committed", block: 124893 };
   }
 
+  async function verifyOperatorPin(facilityId, staffId, pin, purpose) {
+    if (!config.mock) {
+      return request("/operator-authorizations/verify", {
+        method: "POST",
+        body: JSON.stringify({ facilityId, staffId, pin, purpose }),
+      });
+    }
+    await wait(120);
+    const staff = (window.STAFF_DIRECTORY?.[facilityId] || []).find(
+      (item) => item.staffId === staffId && item.status === "Active"
+    );
+    if (!staff || !staff.operatorPinHash || !/^\d{6}$/.test(String(pin || ""))) {
+      return { authorized: false };
+    }
+    return { authorized: (await sha256(pin)) === staff.operatorPinHash, staffId };
+  }
+
+  async function verifyAdministrativePin(facilityId, staffId, pin) {
+    if (!config.mock) {
+      return request("/staff/administrative-authorizations/verify", {
+        method: "POST",
+        body: JSON.stringify({ facilityId, staffId, pin }),
+      });
+    }
+    await wait(120);
+    const staff = (window.STAFF_DIRECTORY?.[facilityId] || []).find(
+      (item) => item.staffId === staffId && item.status === "Active"
+    );
+    if (!staff || !staff.adminPinHash) return { authorized: false };
+    return { authorized: (await sha256(pin)) === staff.adminPinHash, staffId };
+  }
+
+  async function hashMockPin(pin) {
+    return sha256(pin);
+  }
+
   async function getAnalytics(scope, filters) {
     if (!config.mock) {
       const query = new URLSearchParams(filters || {}).toString();
@@ -137,6 +179,6 @@
   }
 
   Object.assign(window, {
-    BloodLedgerApi: { config, getBootstrap, login, logout, createTransfer, ingestScan, getAnalytics },
+    BloodLedgerApi: { config, getBootstrap, login, logout, createTransfer, ingestScan, getAnalytics, verifyOperatorPin, verifyAdministrativePin, hashMockPin },
   });
 })();

@@ -76,7 +76,7 @@ function AnalyticsPage({ hospital, permissions }) {
   const comparableYears = completeYears.length >= 2;
   const comparisonYears = completeYears.slice(-2);
 
-  const exportDemand = () => exportCsvReport({
+  const exportDemand = () => exportPdfReport({
     title: prcView ? "Hospital Demand" : "Department Demand",
     scope: scopeLabel,
     filters,
@@ -85,7 +85,7 @@ function AnalyticsPage({ hospital, permissions }) {
     rows: ranked.map((row) => [row.label, row.requestCount, row.unitsRequested, totalUnits ? `${((row.unitsRequested / totalUnits) * 100).toFixed(1)}%` : "0%"]),
     filename: prcView ? "analytics-hospital-demand" : "analytics-department-demand",
   });
-  const exportMonthly = () => exportCsvReport({
+  const exportMonthly = () => exportPdfReport({
     title: "Monthly Demand",
     scope: scopeLabel,
     filters,
@@ -94,7 +94,7 @@ function AnalyticsPage({ hospital, permissions }) {
     rows: monthly.map((row) => [row.month, row.units, row.complete ? "Complete" : "Incomplete", "Not available"]),
     filename: "analytics-monthly-demand",
   });
-  const exportAssessment = () => exportCsvReport({
+  const exportAssessment = () => exportPdfReport({
     title: "Redistribution Assessment",
     scope: scopeLabel,
     filters,
@@ -143,7 +143,7 @@ function AnalyticsPage({ hospital, permissions }) {
 
         <div className="analytics-two-column">
           <section className="card">
-            <div className="card-h analytics-card-head"><div><h3>Which {prcView ? "hospitals" : "departments"} request blood most often?</h3><div className="sub muted">Ranked using the selected historical period.</div></div><div className="row"><button className={`filter-chip ${metric === "requestCount" ? "active" : ""}`} onClick={() => setMetric("requestCount")}>Requests</button><button className={`filter-chip ${metric === "unitsRequested" ? "active" : ""}`} onClick={() => setMetric("unitsRequested")}>Units</button><Btn size="sm" icon="download" onClick={exportDemand}>Export CSV</Btn></div></div>
+            <div className="card-h analytics-card-head"><div><h3>Which {prcView ? "hospitals" : "departments"} request blood most often?</h3><div className="sub muted">Ranked using the selected historical period.</div></div><div className="row"><button className={`filter-chip ${metric === "requestCount" ? "active" : ""}`} onClick={() => setMetric("requestCount")}>Requests</button><button className={`filter-chip ${metric === "unitsRequested" ? "active" : ""}`} onClick={() => setMetric("unitsRequested")}>Units</button><Btn size="sm" icon="download" onClick={exportDemand}>Export PDF</Btn></div></div>
             <div className="card-b analytics-ranked-chart">
               {ranked.map((row) => <div className="analytics-ranked-row" key={row.label}><span>{row.label}</span><div><i style={{ width: `${(row[metric] / maxRank) * 100}%` }} /></div><b className="mono">{row[metric]}</b></div>)}
             </div>
@@ -151,7 +151,7 @@ function AnalyticsPage({ hospital, permissions }) {
           </section>
 
           <section className="card">
-            <div className="card-h analytics-card-head"><div><h3>Which months have the greatest blood demand?</h3><div className="sub muted">Observed requested units; incomplete months are hatched.</div></div><div className="row">{comparableYears && <button className={`filter-chip ${yearOverYear ? "active" : ""}`} onClick={() => setYearOverYear((value) => !value)}>Year over year</button>}<Btn size="sm" kind="ghost" onClick={() => setShowTable((value) => !value)}>{showTable ? "Show chart" : "Table alternative"}</Btn><Btn size="sm" icon="download" onClick={exportMonthly}>Export CSV</Btn></div></div>
+            <div className="card-h analytics-card-head"><div><h3>Which months have the greatest blood demand?</h3><div className="sub muted">Observed requested units; incomplete months are hatched.</div></div><div className="row">{comparableYears && <button className={`filter-chip ${yearOverYear ? "active" : ""}`} onClick={() => setYearOverYear((value) => !value)}>Year over year</button>}<Btn size="sm" kind="ghost" onClick={() => setShowTable((value) => !value)}>{showTable ? "Show chart" : "Table alternative"}</Btn><Btn size="sm" icon="download" onClick={exportMonthly}>Export PDF</Btn></div></div>
             <div className="card-b">
               {showTable ? <div className="analytics-table-wrap"><table><thead><tr><th>Month</th><th>Requested units</th><th>Coverage</th><th>Confirmed use</th></tr></thead><tbody>{monthly.map((row) => <tr key={row.month}><td className="mono">{row.month}</td><td className="mono">{row.units}</td><td><Chip kind={row.complete ? "ok" : "warn"}>{row.complete ? "Complete" : "Incomplete"}</Chip></td><td>Not available</td></tr>)}</tbody></table></div> : yearOverYear && comparableYears ? <div className="analytics-yoy-chart">{Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0")).map((monthNumber) => <div key={monthNumber}><div>{comparisonYears.map((year, yearIndex) => { const item = monthly.find((row) => row.month === `${year}-${monthNumber}`); return <i key={year} className={`year-${yearIndex + 1}`} style={{ height: `${Math.max(6, ((item?.units || 0) / maxMonth) * 100)}%` }} title={`${year}-${monthNumber}: ${item?.units || "Missing"}`} />; })}</div><span>{monthNumber}</span></div>)}<aside>{comparisonYears.map((year, index) => <span key={year}><i className={`year-${index + 1}`} />{year}</span>)}</aside></div> : <div className="analytics-month-chart">{monthly.map((row) => <div key={row.month} title={`${row.month}: ${row.units} requested units${row.complete ? "" : " (incomplete)"}`}><b className="mono">{row.units}</b><i className={row.complete ? "" : "incomplete"} style={{ height: `${Math.max(8, (row.units / maxMonth) * 100)}%` }} /><span>{row.month.slice(2)}</span></div>)}</div>}
               <div className="analytics-chart-notes"><span>Complete-month average: <b>{average.toFixed(1)} units</b></span><span>Confirmed use: <b>Unavailable</b></span><span>Year-over-year: <b>{comparableYears ? "Available for selected complete years" : "Needs two comparable complete years"}</b></span></div>
@@ -162,7 +162,7 @@ function AnalyticsPage({ hospital, permissions }) {
         <section className="card analytics-purpose-panel"><div className="card-h"><div><h3>Requested purpose and actual use</h3><div className="sub muted">Requested purpose and confirmed use remain separate datasets.</div></div></div><div className="card-b analytics-awaiting"><I name="clock" size={20} /><div><strong>Awaiting approved aggregate categories and data source</strong><span>No patient details, diagnoses, treatments, clinical free text, or inferred classifications are shown.</span></div></div></section>
 
         <section className="card">
-          <div className="card-h analytics-card-head"><div><h3>Redistribution assessment</h3><div className="sub muted">Backend-shaped values by blood type and component. The frontend performs no surplus calculation.</div></div><Btn size="sm" icon="download" onClick={exportAssessment}>Export CSV</Btn></div>
+          <div className="card-h analytics-card-head"><div><h3>Redistribution assessment</h3><div className="sub muted">Backend-shaped values by blood type and component. The frontend performs no surplus calculation.</div></div><Btn size="sm" icon="download" onClick={exportAssessment}>Export PDF</Btn></div>
           <div className="analytics-table-wrap"><table className="analytics-assessment-table"><thead><tr>{prcView && <th>Facility</th>}<th>Blood</th><th>Component</th><th>Eligible stock</th><th>Expected demand</th><th>Horizon</th><th>Uncertainty</th><th>Safety</th><th>Reserve</th><th>Est. surplus</th><th>Assessment</th><th>Generated / freshness</th></tr></thead><tbody>{(data.assessments || []).map((row, index) => { const unavailable = row.estimatedSurplus == null || row.freshness === "Stale"; return <tr key={`${row.facilityId}-${row.bloodType}-${row.component}-${index}`}>{prcView && <td>{hospitalById(row.facilityId)?.short}</td>}<td><BloodType type={row.bloodType} /></td><td>{row.component}</td><td className="mono">{row.eligibleUnreservedStock}</td><td className="mono">{row.expectedDemand}</td><td>{row.forecastHorizon}</td><td className="mono">{row.uncertainty}</td><td className="mono">{row.safetyAllowance}</td><td className="mono">{row.minimumReserve}</td><td className="mono">{row.estimatedSurplus == null ? "—" : row.estimatedSurplus}</td><td><Chip kind={unavailable ? "warn" : row.status === "Review candidate" ? "info" : "neutral"}>{unavailable ? "Assessment unavailable" : row.status}</Chip><small>{unavailable && row.freshness === "Stale" ? "Forecast is stale." : row.explanation}</small></td><td><span className="mono small">{row.generatedAt}</span><Chip kind={row.freshness === "Current" ? "ok" : "warn"}>{row.freshness}</Chip></td></tr>; })}</tbody></table></div>
           <div className="analytics-table-disclosure">Simulation only—not authorization to redistribute. Operational release always requires authorized human review.</div>
         </section>

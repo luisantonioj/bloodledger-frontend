@@ -12,7 +12,7 @@
 // - Summarizes stock by blood type and blood component.
 // - Allows an authorized hospital user to capture a checkpoint snapshot.
 // - Allows captured snapshots to be marked as verified.
-// - Allows verified records to be exported as CSV.
+// - Allows verified records to be exported as fixed-layout PDF reports.
 // - DOH/regulator users receive a read-only monitoring view.
 //
 // Direct electronic submission to DOH is intentionally not implemented
@@ -23,10 +23,13 @@ function ReportingPage({
   session,
   permissions,
   staffDirectory,
-  dutySchedules,
   operatorId,
   operator,
   onOperatorChange,
+  operatorPin,
+  onOperatorPinChange,
+  authorizeOperator,
+  clearOperatorAuthorization,
 }) {
   const inventory = permissions?.bloodBank ? facilityInventory(hospital) : window.INVENTORY || [];
   const bloodTypes = window.BLOOD_TYPES || [];
@@ -50,6 +53,9 @@ function ReportingPage({
     React.useState("09:00");
 
   const [selectedSnapshotId, setSelectedSnapshotId] =
+    React.useState(null);
+
+  const [pendingAuthorization, setPendingAuthorization] =
     React.useState(null);
 
   const [snapshots, setSnapshots] =
@@ -227,17 +233,15 @@ function ReportingPage({
   // =========================================================
 
   const captureSnapshot =
-    () => {
+    async () => {
       if (
         isReadOnly
       ) {
         return;
       }
 
-      if (!operator) {
-        toast.push({ kind: "warn", text: "Transaction operator required", sub: "Select an Active staff member before capturing a compliance checkpoint." });
-        return;
-      }
+      const verifiedOperator = await authorizeOperator?.("compliance checkpoint capture");
+      if (!verifiedOperator) return;
 
       if (
         checkpointExists
@@ -298,11 +302,11 @@ function ReportingPage({
         capturedAt,
 
         capturedBy:
-          operator.name,
+          verifiedOperator.name,
 
-        operatorStaffId: operator.staffId,
+        operatorStaffId: verifiedOperator.staffId,
 
-        operatorClassification: operator.classification,
+        operatorClassification: verifiedOperator.classification,
 
         status:
           "Pending Verification",
@@ -341,6 +345,7 @@ function ReportingPage({
       setSelectedSnapshotId(
         id
       );
+      setPendingAuthorization(null);
     };
 
 
@@ -349,7 +354,7 @@ function ReportingPage({
   // =========================================================
 
   const verifySnapshot =
-    (
+    async (
       snapshotId
     ) => {
       if (
@@ -358,10 +363,8 @@ function ReportingPage({
         return;
       }
 
-      if (!operator) {
-        toast.push({ kind: "warn", text: "Transaction operator required", sub: "Select an Active staff member before verifying a compliance checkpoint." });
-        return;
-      }
+      const verifiedOperator = await authorizeOperator?.("compliance checkpoint verification");
+      if (!verifiedOperator) return;
 
 
       const now =
@@ -397,25 +400,26 @@ function ReportingPage({
                       now,
 
                     verifiedBy:
-                      operator.name,
+                      verifiedOperator.name,
 
                     verifiedByStaffId:
-                      operator.staffId,
+                      verifiedOperator.staffId,
 
                     verifiedByClassification:
-                      operator.classification,
+                      verifiedOperator.classification,
                   }
                 : snapshot
           )
       );
+      setPendingAuthorization(null);
     };
 
 
   // =========================================================
-  // EXPORT SNAPSHOT AS CSV
+  // EXPORT SNAPSHOT AS PDF
   // =========================================================
 
-  const exportSnapshotCSV =
+  const exportSnapshotPDF =
     (
       snapshot
     ) => {
@@ -426,7 +430,7 @@ function ReportingPage({
       }
 
 
-      exportCsvReport({
+      exportPdfReport({
         title: "BloodLedger Compliance Report",
         scope: snapshot.hospitalName,
         filters: { date: snapshot.date, checkpoint: snapshot.periodLabel, status: snapshot.status },
@@ -460,8 +464,6 @@ function ReportingPage({
         }
 
       />
-
-      {!isReadOnly && <OperatorSelector hospital={hospital} staffDirectory={staffDirectory} dutySchedules={dutySchedules} operatorId={operatorId} onOperatorChange={onOperatorChange} />}
 
 
       {/* =====================================================
@@ -728,9 +730,7 @@ function ReportingPage({
                       checkpointExists
                     }
 
-                    onClick={
-                      captureSnapshot
-                    }
+                    onClick={() => setPendingAuthorization({ type: "capture" })}
 
                   >
 
@@ -1308,11 +1308,7 @@ function ReportingPage({
 
                             icon="check"
 
-                            onClick={() =>
-                              verifySnapshot(
-                                selectedSnapshot.id
-                              )
-                            }
+                            onClick={() => setPendingAuthorization({ type: "verify", snapshotId: selectedSnapshot.id })}
 
                           >
 
@@ -1334,14 +1330,14 @@ function ReportingPage({
                             icon="download"
 
                             onClick={() =>
-                              exportSnapshotCSV(
+                              exportSnapshotPDF(
                                 selectedSnapshot
                               )
                             }
 
                           >
 
-                            Export CSV
+                            Export PDF
 
                           </Btn>
 
@@ -1424,14 +1420,14 @@ function ReportingPage({
                       size="sm"
 
                       onClick={() =>
-                        exportSnapshotCSV(
+                        exportSnapshotPDF(
                           selectedSnapshot
                         )
                       }
 
                     >
 
-                      Export CSV
+                      Export PDF
 
                     </Btn>
 
@@ -1528,8 +1524,10 @@ function ReportingPage({
 
                 BloodLedger generates twice-daily inventory snapshots from the
                 hospital's recorded blood stock. Verified records can be
-                exported as CSV files for spreadsheet use, record keeping, or
-                preparation for submission. The exact verification, approval,
+                exported as organized PDF files for fixed-layout record keeping
+                and preparation for submission. Each report includes its scope,
+                filters, report ID, generation time, and a prototype data checksum.
+                The exact verification, approval,
                 official export format, and submission process will be
                 finalized after validation with hospital and DOH stakeholders.
                 This prototype does not assume a direct electronic connection
@@ -1544,6 +1542,8 @@ function ReportingPage({
         </div>
 
       </div>
+
+      {pendingAuthorization && !isReadOnly && <Modal title={pendingAuthorization.type === "capture" ? `Capture ${selectedPeriodLabel} Snapshot` : "Verify Compliance Record"} sub="Authenticate the Active staff member responsible for this compliance action." onClose={() => { setPendingAuthorization(null); clearOperatorAuthorization?.(); }} footer={<><Btn kind="ghost" onClick={() => { setPendingAuthorization(null); clearOperatorAuthorization?.(); }}>Cancel</Btn><Btn kind="primary" icon="shield" onClick={() => pendingAuthorization.type === "capture" ? captureSnapshot() : verifySnapshot(pendingAuthorization.snapshotId)}>{pendingAuthorization.type === "capture" ? "Authorize & Capture" : "Authorize & Verify"}</Btn></>}><OperatorAuthorization hospital={hospital} staffDirectory={staffDirectory} operatorId={operatorId} onOperatorChange={onOperatorChange} operatorPin={operatorPin} onOperatorPinChange={onOperatorPinChange} purpose={pendingAuthorization.type === "capture" ? "this checkpoint capture" : "this checkpoint verification"} /></Modal>}
 
     </div>
   );

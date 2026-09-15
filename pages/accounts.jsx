@@ -45,7 +45,7 @@ function AccountsPage({ hospital, session, permissions, accountApplications, onU
     return `${prefix || "INST"}-${String(Date.now()).slice(-4)}`;
   };
 
-  const decide = (status) => {
+  const decide = async (status) => {
     if (!decision || !note.trim()) return;
     let assignedHospital = decision.hospital;
 
@@ -81,6 +81,8 @@ function AccountsPage({ hospital, session, permissions, accountApplications, onU
     onUpdateAccountApplications(nextApplications);
 
     if (status === "Approved") {
+      const temporaryAdminPinHash = await BloodLedgerApi.hashMockPin("2468");
+      const temporaryOperatorPinHash = await BloodLedgerApi.hashMockPin("246810");
       const initials = decision.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
       const approvedAccount = {
         email: decision.email,
@@ -104,7 +106,9 @@ function AccountsPage({ hospital, session, permissions, accountApplications, onU
         status: "Active",
         professionalLicense: decision.facility?.headLicense || decision.facility?.medtechLicense || null,
         phone: decision.facility?.phone || null,
-        adminPin: "2468",
+        adminPinHash: temporaryAdminPinHash,
+        operatorPinHash: temporaryOperatorPinHash,
+        pinEnrolledAt: new Date().toISOString().slice(0, 19).replace("T", " "),
         createdFromApplication: decision.id,
       };
       const nextDirectory = { ...(staffDirectory || window.STAFF_DIRECTORY || {}), [assignedHospital]: [firstStaff] };
@@ -129,14 +133,15 @@ function AccountsPage({ hospital, session, permissions, accountApplications, onU
     setNote("");
   };
 
-  const recoverAdministrator = () => {
+  const recoverAdministrator = async () => {
     if (!recoveryTarget || !recoveryStaffId || !note.trim()) return;
     const roster = (staffDirectory || window.STAFF_DIRECTORY || {})[recoveryTarget.id] || [];
     const replacement = roster.find((staff) => staff.staffId === recoveryStaffId && staff.status === "Active");
     if (!replacement) return;
     const adminClass = recoveryTarget.is_blood_bank ? "Blood Bank Head" : "Facility Administrator";
     const staffClass = recoveryTarget.is_blood_bank ? "Blood Bank Staff" : "Requestor Staff";
-    const nextRoster = roster.map((staff) => staff.staffId === replacement.staffId ? { ...staff, classification: adminClass, adminPin: "2468" } : staff.classification === adminClass ? { ...staff, classification: staffClass, adminPin: undefined } : staff);
+    const temporaryAdminPinHash = await BloodLedgerApi.hashMockPin("2468");
+    const nextRoster = roster.map((staff) => staff.staffId === replacement.staffId ? { ...staff, classification: adminClass, adminPinHash: temporaryAdminPinHash } : staff.classification === adminClass ? { ...staff, classification: staffClass, adminPinHash: undefined } : staff);
     const nextDirectory = { ...(staffDirectory || window.STAFF_DIRECTORY || {}), [recoveryTarget.id]: nextRoster };
     onUpdateStaffDirectory?.(nextDirectory);
     window.STAFF_DIRECTORY = nextDirectory;

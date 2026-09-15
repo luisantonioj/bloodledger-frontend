@@ -162,11 +162,8 @@ function App() {
     );
 
   const [staffDirectory, setStaffDirectory] = React.useState(window.STAFF_DIRECTORY || {});
-  const [dutySchedules, setDutySchedules] = React.useState(window.DUTY_SCHEDULES || {});
-  const [operatorByFacility, setOperatorByFacility] = React.useState(() => {
-    const duty = currentDutyForFacility("MMC-LIP", window.DUTY_SCHEDULES || {});
-    return duty.primary ? { "MMC-LIP": duty.primary.staff_id } : {};
-  });
+  const [operatorByFacility, setOperatorByFacility] = React.useState({});
+  const [operatorPin, setOperatorPin] = React.useState("");
 
 
   const permissions =
@@ -188,6 +185,7 @@ function App() {
     id,
     state
   ) => {
+    setOperatorPin("");
     setPage(
       id
     );
@@ -457,36 +455,33 @@ function App() {
     }
   };
 
-  const handleDutySchedulesChange = (nextSchedules) => {
-    setDutySchedules(nextSchedules);
-    window.DUTY_SCHEDULES = nextSchedules;
-    const duty = currentDutyForFacility(session?.hospital?.id, nextSchedules);
-    if (duty.primary) setOperatorByFacility((current) => ({ ...current, [session.hospital.id]: duty.primary.staff_id }));
+  const handleOperatorChange = (staffId) => {
+    setOperatorPin("");
+    setOperatorByFacility((current) => ({ ...current, [session?.hospital?.id]: staffId }));
   };
 
-  const handleOperatorChange = (staffId, reason, scheduledStaffId, shiftEnd) => {
-    const previous = operatorById(session?.hospital?.id, currentOperatorId || scheduledStaffId, staffDirectory);
-    const replacement = operatorById(session?.hospital?.id, staffId, staffDirectory);
-    if (!replacement) return;
-    setOperatorByFacility((current) => ({ ...current, [session.hospital.id]: staffId }));
-    if (previous && previous.staffId !== replacement.staffId) {
-      const event = {
-        timestamp: new Date().toISOString().slice(0, 19).replace("T", " "),
-        activity: "Transaction operator overridden",
-        type: "Transaction operator overridden",
-        user: replacement.name,
-        source: replacement.name,
-        facilityId: session.hospital.id,
-        operatorStaffId: replacement.staffId,
-        operatorName: replacement.name,
-        operatorClassification: replacement.classification,
-        reference: replacement.staffId,
-        details: `${previous.name} replaced by ${replacement.name}. Reason: ${reason}.${shiftEnd ? ` Override valid through ${shiftEnd}.` : ""}`,
-        status: "Recorded",
-        tx_hash: `0x${Math.random().toString(16).slice(2).padEnd(64, "0").slice(0, 64)}`,
-      };
-      handleAuditChange([event, ...auditRows]);
-      toast.push({ kind: "ok", text: "Transaction operator changed", sub: `${replacement.name} is selected for the remainder of this shift.` });
+  const clearOperatorAuthorization = () => setOperatorPin("");
+
+  const authorizeOperator = async (purpose) => {
+    const facilityId = session?.hospital?.id;
+    const operator = operatorById(facilityId, currentOperatorId, staffDirectory);
+    if (!operator || !/^\d{6}$/.test(operatorPin)) {
+      setOperatorPin("");
+      toast.push({ kind: "warn", text: "Operator authorization failed", sub: "Select an Active staff member and enter their six-digit personal PIN." });
+      return null;
+    }
+    try {
+      const result = await BloodLedgerApi.verifyOperatorPin(facilityId, operator.staffId, operatorPin, purpose);
+      setOperatorPin("");
+      if (!result?.authorized) {
+        toast.push({ kind: "warn", text: "Operator authorization failed", sub: "The selected operator or personal PIN could not be verified." });
+        return null;
+      }
+      return operator;
+    } catch (error) {
+      setOperatorPin("");
+      toast.push({ kind: "warn", text: "Operator verification unavailable", sub: error?.message || "Try again before recording this action." });
+      return null;
     }
   };
 
@@ -505,8 +500,8 @@ function App() {
         next
       );
 
-      const duty = currentDutyForFacility(next.hospital?.id, dutySchedules);
-      setOperatorByFacility((current) => ({ ...current, [next.hospital?.id]: duty.primary?.staff_id || "" }));
+      setOperatorByFacility((current) => ({ ...current, [next.hospital?.id]: "" }));
+      setOperatorPin("");
 
       setAuthed(
         true
@@ -542,6 +537,7 @@ function App() {
       setAuthed(
         false
       );
+      setOperatorPin("");
     };
 
 
@@ -620,11 +616,6 @@ function App() {
     onUpdateStaffDirectory:
       handleStaffDirectoryChange,
 
-    dutySchedules,
-
-    onUpdateDutySchedules:
-      handleDutySchedulesChange,
-
     operatorId:
       currentOperatorId,
 
@@ -633,6 +624,15 @@ function App() {
 
     onOperatorChange:
       handleOperatorChange,
+
+    operatorPin,
+
+    onOperatorPinChange:
+      setOperatorPin,
+
+    authorizeOperator,
+
+    clearOperatorAuthorization,
   };
 
 
@@ -682,11 +682,6 @@ function App() {
     accounts: [
       "BloodLedger",
       "Account Administration",
-    ],
-
-    staff: [
-      "BloodLedger",
-      "Staff & Schedule",
     ],
 
     analytics: [
@@ -804,18 +799,6 @@ function App() {
   ) {
     PageBody = (
       <AccountsPage
-        {...pageProps}
-      />
-    );
-  }
-
-
-  else if (
-    page ===
-    "staff"
-  ) {
-    PageBody = (
-      <StaffSchedulePage
         {...pageProps}
       />
     );

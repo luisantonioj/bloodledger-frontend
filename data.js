@@ -1097,54 +1097,29 @@ window.USER_PROFILE_DETAILS = {
 };
 
 // Facility accounts authenticate the institution. Individual staff members are
-// selected at the point of each mutable action so the ledger retains human
-// attribution without requiring staff to repeatedly sign in and out.
+// selected and PIN-verified at every mutable action so the ledger retains human
+// attribution without requiring separate personal login accounts. PIN hashes are
+// synthetic frontend fixtures only; production verification belongs on the API.
 window.STAFF_DIRECTORY = {
   "MMC-LIP": [
-    { staffId: "MMC-BBH-0042", name: "Dr. R. Reyes", initials: "RR", classification: "Blood Bank Head", status: "Active", professionalLicense: "PRC-MD-0084217", phone: "+63 917 555 0142", adminPin: "4826" },
-    { staffId: "MMC-BBS-0187", name: "M. Santos, RMT", initials: "MS", classification: "Blood Bank Staff", status: "Active", professionalLicense: "PRC-MT-0063187", phone: "+63 917 555 0187" },
+    { staffId: "MMC-BBH-0042", name: "Dr. R. Reyes", initials: "RR", classification: "Blood Bank Head", status: "Active", professionalLicense: "PRC-MD-0084217", phone: "+63 917 555 0142", adminPinHash: "0a4e3e70597a358b9447fa8a647aadf5b76dde95c8e4ab02e5f8cee6caa1cd28", operatorPinHash: "2ea353528b54b46099a71e2af7119815c6424382f69a786589c3a2070d449ce1", pinEnrolledAt: "2026-09-14 09:00" },
+    { staffId: "MMC-BBS-0187", name: "M. Santos, RMT", initials: "MS", classification: "Blood Bank Staff", status: "Active", professionalLicense: "PRC-MT-0063187", phone: "+63 917 555 0187", operatorPinHash: "bd254834f57e5232f66d3f17b9d3efaab9c042001a11fa9792018bd6ddb606b8", pinEnrolledAt: "2026-09-14 09:00" },
   ],
   "MDH-LIP": [
-    { staffId: "MDH-BBH-0025", name: "Dr. M. Dela Cruz", initials: "MD", classification: "Blood Bank Head", status: "Active", professionalLicense: "PRC-MD-0074025", phone: "+63 917 555 0025", adminPin: "2649" },
-    { staffId: "MDH-BBS-0192", name: "A. Lim, RMT", initials: "AL", classification: "Blood Bank Staff", status: "Active", professionalLicense: "PRC-MT-0057192", phone: "+63 917 555 0192" },
-    { staffId: "MDH-BBS-0193", name: "S. Bautista", initials: "SB", classification: "Blood Bank Staff", status: "Active", phone: "+63 917 555 0193" },
+    { staffId: "MDH-BBH-0025", name: "Dr. M. Dela Cruz", initials: "MD", classification: "Blood Bank Head", status: "Active", professionalLicense: "PRC-MD-0074025", phone: "+63 917 555 0025", adminPinHash: "87557ad1d2f9c36266be01980669ed8ba1b5375d552385b12db8cacd04a8f8d0", operatorPinHash: "ebf0574326a146aafe807031bc44d3d6d4595f16229758403d1b4478d65e66ce", pinEnrolledAt: "2026-09-14 09:00" },
+    { staffId: "MDH-BBS-0192", name: "A. Lim, RMT", initials: "AL", classification: "Blood Bank Staff", status: "Active", professionalLicense: "PRC-MT-0057192", phone: "+63 917 555 0192", operatorPinHash: "ef8cf6a5c983d014a53b9e32e1d3bb38e098281032a27c07aa76678d968db391", pinEnrolledAt: "2026-09-14 09:00" },
+    { staffId: "MDH-BBS-0193", name: "S. Bautista", initials: "SB", classification: "Blood Bank Staff", status: "Active", phone: "+63 917 555 0193", operatorPinHash: "f29276d7ab2dffecc070cc0ecba582b34d68bc3a8d49c399a58725c034898028", pinEnrolledAt: "2026-09-14 09:00" },
   ],
   "CLH-LIP": [
-    { staffId: "CLH-BBH-0019", name: "Dr. P. Hernandez", initials: "PH", classification: "Blood Bank Head", status: "Active", professionalLicense: "PRC-MD-0068019", phone: "+63 917 555 0019", adminPin: "8153" },
-    { staffId: "CLH-BBS-0127", name: "D. Flores, RMT", initials: "DF", classification: "Blood Bank Staff", status: "Active", professionalLicense: "PRC-MT-0048127", phone: "+63 917 555 0127" },
-    { staffId: "CLH-BBS-0128", name: "N. Aquino", initials: "NA", classification: "Blood Bank Staff", status: "Active", phone: "+63 917 555 0128" },
+    { staffId: "CLH-BBH-0019", name: "Dr. P. Hernandez", initials: "PH", classification: "Blood Bank Head", status: "Active", professionalLicense: "PRC-MD-0068019", phone: "+63 917 555 0019", adminPinHash: "1fcb898a0aaf228a69b461bf0939d8e0c7fcdb8e3a19d70fde4b7d4a1874f8f7", operatorPinHash: "a6a9b4ccd20d618d49b7265cb1f1aefe61fc0701c7f86a07f01b22663bf1b52c", pinEnrolledAt: "2026-09-14 09:00" },
+    { staffId: "CLH-BBS-0127", name: "D. Flores, RMT", initials: "DF", classification: "Blood Bank Staff", status: "Active", professionalLicense: "PRC-MT-0048127", phone: "+63 917 555 0127", operatorPinHash: "78bab912a83ea770b932ce5d71ef708d5fff741ebc53b937b24049f907a7e7af", pinEnrolledAt: "2026-09-14 09:00" },
+    { staffId: "CLH-BBS-0128", name: "N. Aquino", initials: "NA", classification: "Blood Bank Staff", status: "Active", phone: "+63 917 555 0128", operatorPinHash: "e5f46b4b5180a1406793cb1eb4a80ee64d4866406b0fc5d71ca38b02f709eaff", pinEnrolledAt: "2026-09-14 09:00" },
   ],
   "LMC-LIP": [
-    { staffId: "LMC-FA-0116", name: "C. Tan", initials: "CT", classification: "Facility Administrator", status: "Active", phone: "+63 917 555 0116", adminPin: "7315" },
-    { staffId: "LMC-RS-0284", name: "J. Ramos, RMT", initials: "JR", classification: "Requestor Staff", status: "Active", professionalLicense: "PRC-MT-0059284", phone: "+63 917 555 0284" },
+    { staffId: "LMC-FA-0116", name: "C. Tan", initials: "CT", classification: "Facility Administrator", status: "Active", phone: "+63 917 555 0116", adminPinHash: "0c9de27d6a59e0356abcc7b5127f362ebf23dc41edb5c45473fccb38d633c6c5", operatorPinHash: "949b1b8dccd4a43093188b850c41a24f52d404bf44acc3603d05c17b8ef382b1", pinEnrolledAt: "2026-09-14 09:00" },
+    { staffId: "LMC-RS-0284", name: "J. Ramos, RMT", initials: "JR", classification: "Requestor Staff", status: "Active", professionalLicense: "PRC-MT-0059284", phone: "+63 917 555 0284", operatorPinHash: "d4dbc3392bbcb9a2e9aab861ed8162a20145b54655f65f121007668ad6158d97", pinEnrolledAt: "2026-09-14 09:00" },
   ],
 };
-
-(function seedDutySchedules() {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  const day = `${yyyy}-${mm}-${dd}`;
-  window.DUTY_SCHEDULES = {
-    "MMC-LIP": [
-      { staff_id: "MMC-BBS-0187", staff_name: "M. Santos, RMT", shift_start: `${day} 00:00`, shift_end: `${day} 23:59`, assignment: "Primary" },
-      { staff_id: "MMC-BBH-0042", staff_name: "Dr. R. Reyes", shift_start: `${day} 00:00`, shift_end: `${day} 23:59`, assignment: "Supporting" },
-    ],
-    "MDH-LIP": [
-      { staff_id: "MDH-BBS-0192", staff_name: "A. Lim, RMT", shift_start: `${day} 00:00`, shift_end: `${day} 23:59`, assignment: "Primary" },
-      { staff_id: "MDH-BBH-0025", staff_name: "Dr. M. Dela Cruz", shift_start: `${day} 00:00`, shift_end: `${day} 23:59`, assignment: "Supporting" },
-    ],
-    "CLH-LIP": [
-      { staff_id: "CLH-BBS-0127", staff_name: "D. Flores, RMT", shift_start: `${day} 00:00`, shift_end: `${day} 23:59`, assignment: "Primary" },
-      { staff_id: "CLH-BBH-0019", staff_name: "Dr. P. Hernandez", shift_start: `${day} 00:00`, shift_end: `${day} 23:59`, assignment: "Supporting" },
-    ],
-    "LMC-LIP": [
-      { staff_id: "LMC-RS-0284", staff_name: "J. Ramos, RMT", shift_start: `${day} 00:00`, shift_end: `${day} 23:59`, assignment: "Primary" },
-      { staff_id: "LMC-FA-0116", staff_name: "C. Tan", shift_start: `${day} 00:00`, shift_end: `${day} 23:59`, assignment: "Supporting" },
-    ],
-  };
-})();
 
 // Synthetic, non-clinical aggregate history used only to demonstrate the
 // future analytics API contract. Confirmed-use values intentionally remain null.

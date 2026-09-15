@@ -19,7 +19,7 @@ The prototype uses organizational accounts rather than personal hospital logins.
 | **PRC Administrator** | Philippine Red Cross Lipa Chapter (system administrator and supply hub) | Review institutional applications, manage accounts, monitor blood-bank shortages, and coordinate replenishment | Consortium administration plus read-only supply coordination |
 | **Regulator (DOH)** | DOH-CHD Calabarzon | See which blood banks met required reporting checkpoints and review compliance exceptions | Read-only Dashboard, Alerts, and Compliance Reports; no operational inventory or write actions |
 
-Blood-bank Staff Directories use the classifications **Blood Bank Head** and **Blood Bank Staff**. Requestor directories use **Facility Administrator** and **Requestor Staff**. These classifications govern administration and attribution but are not separate login accounts. Routine blood operations do not require Head approval or a Head PIN; administrative staff and schedule changes do.
+Blood-bank Staff Directories use the classifications **Blood Bank Head** and **Blood Bank Staff**. Requestor directories use **Facility Administrator** and **Requestor Staff**. These classifications govern administration and attribution but are not separate login accounts. Routine blood operations do not require Head approval, but every facility ledger-changing action requires the selected operator's fresh personal PIN. Heads and Facility Administrators use a separate administrative PIN for protected Staff Directory changes in Profile. Duty scheduling is intentionally outside the prototype.
 
 The login screen (`pages/login.jsx`) is the canonical reference for these four roles and their one-line descriptions — keep any future role-permission work consistent with that copy.
 
@@ -37,7 +37,7 @@ Each page in the app corresponds to functionality the research proposal specifie
 | **Consortium** | Cross-hospital inventory heatmap, network topology map (live vs. read-only links), peer/node health table | FR-03, stakeholder network |
 | **Audit** | Immutable, filterable ledger of every action (dispatch, receive, override, signature, sensor event) with hash/block/geo-signature detail | FR-10, FR-11, NFR-02 |
 | **Analytics** | Authorized blood-bank demand history and PRC consortium comparisons, plus clearly marked simulation-only redistribution assessments | Forecasting objective; decision support only |
-| **Reporting** | Compliance checkpoints and role-scoped CSV exports from relevant operational modules | Stakeholder reporting access, automated report generation objective |
+| **Reporting** | Compliance checkpoints and role-scoped fixed-layout PDF exports from relevant operational modules | Stakeholder reporting access, automated report generation objective |
 
 BROA (Blood Recommendation & Optimization Agent, referred to in the UI copy) is the throughline across Dashboard, Alerts, and Transfers: it ranks candidate source hospitals by stock, distance, expiry/FEFO score, and produces the score shown as "BROA score" throughout. Requestors submit one request without choosing a hospital; the prototype assigns the strongest eligible source from current redistributable availability. The production recommendation remains a backend/chaincode responsibility.
 
@@ -58,7 +58,7 @@ BROA (Blood Recommendation & Optimization Agent, referred to in the UI copy) is 
 1. An authorized user opens **Blood Unit Transactions** and launches its mobile scanner simulation. They select inbound or outbound; secondary requestors are restricted to inbound.
 2. The user opens the rear camera, uploads a label photo, or enters details manually. OCR reads the printed ISBT-128 donation serial; it does not scan a barcode or QR code.
 3. The recognized serial remains editable and is matched to the prototype unit catalog. Unknown serials continue to manual product-detail entry instead of silently inventing data.
-4. The user reviews blood type, component, dates, source/destination, purpose, and OCR confidence, then confirms through a modal.
+4. The user reviews blood type, component, dates, source/destination, purpose, and OCR confidence, then selects an Active operator and enters that operator's fresh personal PIN in the confirmation sheet.
 5. The app creates scan and transaction identifiers, records a truncated mock blockchain identifier while online, updates the relevant mock inventory state, and adds an Activity History entry. Offline records are marked **Buffered** for a future backend synchronization layer.
 
 ### 3. Investigating an audit event
@@ -73,7 +73,7 @@ BROA (Blood Recommendation & Optimization Agent, referred to in the UI copy) is 
 
 ### 5. Signing in
 1. User signs in with the approved Facility Account, PRC account, or DOH account.
-2. On submit, the app renders navigation appropriate to the institution and authorized scope. Facility staff attribution is selected only when an action changes ledger state.
+2. On submit, the app renders navigation appropriate to the institution and authorized scope. Facility staff attribution and personal PIN verification occur only when an action changes ledger state.
 
 ## Constraints (do not violate these when extending the UI)
 
@@ -87,7 +87,7 @@ These map directly to the proposal's Scopes and Limitations and Non-Functional R
 - **Transfer states must include exception paths.** Per panel feedback, transfers need pending/delayed/rejected/compromised states in addition to the happy path (Dispatched → In Transit → Received). The current prototype only implements the happy path in its status stepper — this is a known gap tracked in `tasks.md`, not a design decision to preserve.
 - **Dashboard data must read as "real-time."** NFR-06 requires inventory changes to reflect within 5 seconds of a scan event under normal conditions. This doesn't change frontend visuals, but it does mean any future data-fetching implementation needs to poll or subscribe frequently enough that the UI's "Live," pulsing dots, and "block 124,892"-style status indicators remain honest once real data is wired in.
 - **On-premise / Philippine Data Privacy Act compliance (NFR-07).** Not a frontend concern to render, but relevant if the frontend ever needs to describe data residency to a user (e.g. in the login screen's compliance footnote, which already references DOH Administrative Order 2008-0008 — keep this kind of regulatory copy accurate rather than inventing new claims).
-- **Institution identity and operator attribution are separate.** Hospitals use one Facility Account. Mutable events must retain facility ID plus the selected Active staff member's ID, name, classification at action time, timestamp, and audit/ledger identifier. Staff becoming Inactive must not rewrite history.
+- **Institution identity and operator attribution are separate.** Hospitals use one Facility Account. Every mutable event requires a fresh personal operator PIN and must retain facility ID plus the verified Active staff member's ID, name, classification at action time, timestamp, and audit/ledger identifier. PINs and PIN hashes never enter the ledger. Staff becoming Inactive must not rewrite history.
 - **Analytics is read-only decision support.** Access requires both eligible institution type and permission. Forecasts and surplus assessments are synthetic, backend-shaped fixtures and must remain visibly labeled as simulation-only—not authorization to redistribute.
-- **Exports follow the viewer's authorized scope.** Generate only the currently filtered records and never include credentials, PINs, patient information, diagnoses, treatments, clinical free text, private attachments, or another institution's unauthorized data.
+- **PDF exports follow the viewer's authorized scope.** Generate only the currently filtered records and never include credentials, PINs, patient information, diagnoses, treatments, clinical free text, private attachments, or another institution's unauthorized data. Prototype checksums describe the exported data but do not make a client-generated PDF cryptographically signed.
 - **This is a proof-of-concept for one city consortium**, not a provincial/regional/national system. Avoid scope creep in copy or features (e.g. no multi-region switching, no non-Lipa hospitals) — the six-node consortium in `data.js` (`HOSPITALS`) is the intended scale for this phase.
